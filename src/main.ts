@@ -1,12 +1,20 @@
-import { Engine } from "excalibur";
+import { Color, DisplayMode, Engine } from "excalibur";
+import { ShipSystem } from "./ecs/ship/ship-ecs";
 import { Player } from "./player";
 import { loader } from "./resources";
-import { ShipSystem } from "./ecs/ship/ship-ecs";
 
 class Game extends Engine {
     constructor() {
-        super({ width: 800, height: 600 });
+        super({
+            width: 400,
+            height: 600,
+            displayMode: DisplayMode.FitContainerAndFill,
+            antialiasing: false,
+            backgroundColor: Color.Black,
+            canvasElementId: "game",
+        });
     }
+
     initialize() {
         this.currentScene.world.add(ShipSystem);
 

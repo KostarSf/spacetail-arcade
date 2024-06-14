@@ -14,7 +14,10 @@ export class Player extends Actor {
     }
 
     onInitialize(engine: Engine): void {
-        this.graphics.add(Resources.Sword.toSprite());
+        const sprite = Resources.Player.toSprite();
+        sprite.scale.scaleEqual(1);
+        this.graphics.add(sprite);
+
         engine.input.pointers.on("move", (e) => {
             this.ship.rotationTarget = e.worldPos;
         });
