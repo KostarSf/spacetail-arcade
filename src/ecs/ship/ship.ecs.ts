@@ -56,7 +56,7 @@ export class ShipSystem extends System {
 
             if (ship.accelerated) {
                 motion.vel.addEqual(
-                    Vector.fromAngle(transform.rotation).scale(50 / elapsedMs)
+                    Vector.fromAngle(transform.rotation).scale(20 / elapsedMs)
                 );
             } else {
                 motion.vel.scaleEqual(0.998);
