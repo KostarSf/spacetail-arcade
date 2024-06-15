@@ -6,7 +6,6 @@ import {
     Component,
     Entity,
     MotionComponent,
-    PostCollisionEvent,
     PreCollisionEvent,
     TransformComponent,
 } from "excalibur";
@@ -37,18 +36,14 @@ export class SolidBodyComponent extends Component {
             }
 
             const thisBody = precollision.target.owner.get(SolidBodyComponent);
-            const thisTransform =
-                precollision.target.owner.get(TransformComponent);
+            const thisTransform = precollision.target.owner.get(TransformComponent);
             const thisMotion = precollision.target.owner.get(MotionComponent);
 
             const otherBody = precollision.other.owner.get(SolidBodyComponent);
-            const otherTransform =
-                precollision.other.owner.get(TransformComponent);
+            const otherTransform = precollision.other.owner.get(TransformComponent);
             const otherMotion = precollision.other.owner.get(MotionComponent);
 
-            const collisionDirection = otherTransform.pos.sub(
-                thisTransform.pos
-            );
+            const collisionDirection = otherTransform.pos.sub(thisTransform.pos);
             if (collisionDirection.squareDistance() === 0) {
                 return;
             }
@@ -68,9 +63,7 @@ export class SolidBodyComponent extends Component {
                 (1 / thisBody.mass + 1 / otherBody.mass);
 
             const impulse = collisionNormal.scale(impulseScalar);
-            thisMotion.vel = thisMotion.vel.sub(
-                impulse.scale(1 / thisBody.mass)
-            );
+            thisMotion.vel = thisMotion.vel.sub(impulse.scale(1 / thisBody.mass));
         });
     }
 }

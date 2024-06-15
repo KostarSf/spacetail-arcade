@@ -26,11 +26,7 @@ export class ShipSystem extends System {
     public systemType: SystemType = SystemType.Update;
     public priority: number = SystemPriority.Average;
 
-    private query: Query<
-        | typeof ShipComponent
-        | typeof TransformComponent
-        | typeof MotionComponent
-    >;
+    private query: Query<typeof ShipComponent | typeof TransformComponent | typeof MotionComponent>;
 
     constructor(world: World) {
         super();
@@ -49,15 +45,11 @@ export class ShipSystem extends System {
             ship = entities[i].get(ShipComponent);
 
             if (ship.rotationTarget) {
-                transform.rotation = ship.rotationTarget
-                    .sub(transform.globalPos)
-                    .toAngle();
+                transform.rotation = ship.rotationTarget.sub(transform.globalPos).toAngle();
             }
 
             if (ship.accelerated) {
-                motion.vel.addEqual(
-                    Vector.fromAngle(transform.rotation).scale(20 / elapsedMs)
-                );
+                motion.vel.addEqual(Vector.fromAngle(transform.rotation).scale(20 / elapsedMs));
             } else {
                 motion.vel.scaleEqual(0.998);
             }

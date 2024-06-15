@@ -1,15 +1,9 @@
-import {
-    Actor,
-    CollisionType,
-    Color,
-    DisplayMode,
-    Engine,
-    vec,
-} from "excalibur";
-import { ShipSystem } from "./ecs/ship/ship.ecs";
-import { Player } from "./player";
-import { loader } from "./resources";
-import { SolidBodyComponent } from "./ecs/physics/physics.ecs";
+import { Color, DisplayMode, Engine, vec } from "excalibur";
+import { Asteroid } from "./actors/asteroid";
+import { Decal } from "./actors/decal";
+import { Player } from "./actors/player";
+import { ShipSystem } from "./ecs/ship.ecs";
+import { Resources, loader } from "./resources";
 
 class Game extends Engine {
     constructor() {
@@ -26,17 +20,13 @@ class Game extends Engine {
     initialize() {
         this.currentScene.world.add(ShipSystem);
 
-        const player = new Player();
+        const space = new Decal({ image: Resources.Space, pos: vec(100, 100) });
+        this.add(space);
+
+        const player = new Player({ pos: vec(150, 150) });
         this.add(player);
 
-        const asteroid = new Actor({
-            radius: 10,
-            color: Color.LightGray,
-            pos: vec(200, 300),
-            collisionType: CollisionType.Passive,
-        });
-        asteroid.addComponent(new SolidBodyComponent({ mass: 50 }));
-
+        const asteroid = new Asteroid({ pos: vec(200, 300), mass: 50 });
         this.add(asteroid);
 
         this.start(loader);
