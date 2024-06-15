@@ -22,7 +22,12 @@ class Game extends Engine {
     initialize() {
         this.currentScene.world.add(ShipSystem);
 
-        const space = new Decal({ image: Resources.Space, pos: vec(100, 100) });
+        const space = new Decal({
+            image: Resources.Space,
+            pos: vec(100, 100),
+            parallax: 0.2,
+            zoomResist: 1.3,
+        });
         this.add(space);
 
         const player = new Player({ pos: vec(150, 150) });
