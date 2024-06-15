@@ -5,6 +5,7 @@ import { Resources } from "../resources";
 export interface AsteroidOptions {
     pos: Vector;
     mass: number;
+    angularVelocity?: number;
 }
 
 export class Asteroid extends Actor {
@@ -12,7 +13,7 @@ export class Asteroid extends Actor {
         super({
             pos: options.pos,
             radius: 10,
-            angularVelocity: 0.2
+            angularVelocity: options.angularVelocity,
         });
 
         this.addComponent(new SolidBodyComponent({ mass: options.mass }));
