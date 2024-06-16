@@ -1,40 +1,63 @@
-import { Actor, Engine, Keys, PointerButton, PolygonCollider, Vector, vec } from "excalibur";
-import { SolidBodyComponent } from "../ecs/physics.ecs";
-import { ShipComponent } from "../ecs/ship.ecs";
-import { Resources } from "../resources";
+import { Engine, Keys, PointerButton, Vector } from "excalibur";
+import { netClient } from "../network/NetClient";
 import { easeOut, lerp } from "../utils/interpolate";
 import { Bullet } from "./bullet";
+import { Ship, ShipOptions } from "./ship";
 
-export interface PlayerOptions {
-    pos: Vector;
-}
-
-export class Player extends Actor {
+export class Player extends Ship {
     private isMouseControl: boolean = true;
 
-    constructor(options: PlayerOptions) {
-        super({
-            pos: options.pos,
+    constructor(options: ShipOptions) {
+        super(options);
+    }
 
-            collider: new PolygonCollider({
-                points: [vec(-10, -10), vec(15, 0), vec(-10, 10)],
-            }),
+    override set accelerated(value: boolean) {
+        if (value !== this.accelerated) {
+            netClient.send({
+                type: "player",
+                target: this.uuid,
+                action: "accelerated",
+                data: {
+                    value: value,
+                    ...this.serialize(),
+                },
+            });
+        }
+
+        super.accelerated = value;
+    }
+
+    public override fire(): Bullet | undefined {
+        const bullet = super.fire();
+
+        if (!bullet) {
+            return;
+        }
+
+        netClient.send({
+            type: "player",
+            target: this.uuid,
+            action: "fire",
+            data: {
+                object: "Bullet",
+                objectPos: [bullet.pos.x, bullet.pos.y],
+                objectVel: [bullet.vel.x, bullet.vel.y],
+                ...this.serialize(),
+            },
         });
 
-        this.addComponent(new ShipComponent());
-        this.addComponent(new SolidBodyComponent({ mass: 10 }));
+        return bullet;
     }
 
     onInitialize(engine: Engine): void {
-        const sprite = Resources.Player.toSprite();
-        this.graphics.add(sprite);
+        super.onInitialize(engine);
 
         engine.input.pointers.primary.on("move", () => {
             this.isMouseControl = true;
         });
         engine.input.pointers.primary.on("down", (evt) => {
             if (evt.button === PointerButton.Right) {
-                this.ship.accelerated = true;
+                this.accelerated = true;
             }
 
             if (evt.button === PointerButton.Left) {
@@ -43,12 +66,12 @@ export class Player extends Actor {
         });
         engine.input.pointers.primary.on("up", (evt) => {
             if (evt.button === PointerButton.Right) {
-                this.ship.accelerated = false;
+                this.accelerated = false;
             }
         });
         engine.input.keyboard.on("press", (evt) => {
             if (evt.key === Keys.W) {
-                this.ship.accelerated = true;
+                this.accelerated = true;
             }
 
             if (evt.key === Keys.Space) {
@@ -57,7 +80,7 @@ export class Player extends Actor {
         });
         engine.input.keyboard.on("release", (evt) => {
             if (evt.key === Keys.W) {
-                this.ship.accelerated = false;
+                this.accelerated = false;
             }
         });
 
@@ -65,22 +88,12 @@ export class Player extends Actor {
         engine.currentScene.camera.strategy.radiusAroundActor(this, 50);
     }
 
-    private fire() {
-        if (!this.scene) {
-            return;
-        }
-
-        const pos = this.pos.add(Vector.fromAngle(this.rotation).scale(15));
-        const vel = this.vel.add(Vector.fromAngle(this.rotation).scale(350));
-
-        const bullet = new Bullet({ actor: this, pos, vel });
-        this.scene.add(bullet);
-    }
-
     onPostUpdate(engine: Engine, delta: number): void {
         this.updateInputControlls(engine, delta);
         this.updateCameraZoom(engine, delta);
     }
+
+    private oldSendedRotation: number = 0;
 
     private updateInputControlls(engine: Engine, delta: number) {
         let rotationMoment = 0;
@@ -93,13 +106,27 @@ export class Player extends Actor {
             rotationMoment += 1;
         }
 
+        let newRotation = this.rotation;
         if (this.isMouseControl) {
             const cursorScreenPos = engine.input.pointers.primary.lastScreenPos;
-            this.ship.rotationTarget = engine.screenToWorldCoordinates(cursorScreenPos);
+            const rotationTarget = engine.screenToWorldCoordinates(cursorScreenPos);
+            newRotation = rotationTarget.sub(this.pos).toAngle();
         } else {
-            this.ship.rotationTarget = null;
-            const newRotation = this.rotation + (rotationMoment / delta) * 0.2;
-            this.rotation = newRotation;
+            newRotation = this.rotation + (rotationMoment / delta) * 0.2;
+        }
+
+        this.rotation = newRotation;
+
+        if (Math.abs(this.rotation - this.oldSendedRotation) > 0.01) {
+            this.oldSendedRotation = this.rotation;
+            netClient.send({
+                type: "player",
+                target: this.uuid,
+                action: "rotated",
+                data: {
+                    ...this.serialize(),
+                },
+            });
         }
     }
 
@@ -113,7 +140,15 @@ export class Player extends Actor {
         engine.currentScene.camera.zoom = lastZoom + (newZoom - lastZoom) / (delta * 5);
     }
 
-    get ship() {
-        return this.get(ShipComponent);
+    public serialize() {
+        return {
+            pos: this.vecToArray(this.pos),
+            vel: this.vecToArray(this.vel),
+            rotation: Number(this.rotation.toFixed(2)),
+        };
+    }
+
+    private vecToArray(vector: Vector): [number, number] {
+        return [Number(vector.x.toFixed(2)), Number(vector.y.toFixed(2))];
     }
 }

@@ -9,6 +9,8 @@ import {
     PreCollisionEvent,
     TransformComponent,
 } from "excalibur";
+import { netClient } from "../network/NetClient";
+import { UuidComponent } from "./UuidComponent";
 
 export interface SolidBodyOptions {
     mass: number;
@@ -17,7 +19,7 @@ export interface SolidBodyOptions {
 export class SolidBodyComponent extends Component {
     public mass: number;
 
-    readonly dependencies = [MotionComponent, BodyComponent, ColliderComponent];
+    readonly dependencies = [MotionComponent, BodyComponent, ColliderComponent, UuidComponent];
 
     constructor(options: SolidBodyOptions) {
         super();
@@ -64,6 +66,17 @@ export class SolidBodyComponent extends Component {
 
             const impulse = collisionNormal.scale(impulseScalar);
             thisMotion.vel = thisMotion.vel.sub(impulse.scale(1 / thisBody.mass));
+
+            netClient.send({
+                type: "entity",
+                action: "update",
+                target: precollision.target.owner.get(UuidComponent).uuid,
+                data: {
+                    pos: [thisTransform.pos.x, thisTransform.pos.y],
+                    vel: [thisMotion.vel.x, thisMotion.vel.y],
+                    rotation: thisTransform.rotation,
+                },
+            });
         });
     }
 }

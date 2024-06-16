@@ -1,0 +1,100 @@
+import WebSocket from "ws";
+import type { NetEvent } from "../src/network/NetClient";
+
+const server = new WebSocket.Server({ port: 8080 });
+
+let players: {
+    socket: WebSocket;
+    data: {
+        uuid: string;
+        pos: [number, number];
+        vel: [number, number];
+        rotation: number;
+    } | null;
+}[] = [];
+
+server.on("connection", (ws) => {
+    const player: (typeof players)[number] = { socket: ws, data: null };
+    const length = players.push(player);
+
+    console.log(`New client connected (${length})`);
+
+    ws.on("message", (message) => {
+        players.forEach(({ socket }) => {
+            if (socket !== ws && socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+            }
+        });
+
+        const data = JSON.parse(message.toString()) as NetEvent;
+        if (data.type === "player") {
+            player.data = {
+                uuid: data.target,
+                pos: data.data.pos,
+                vel: data.data.vel,
+                rotation: data.data.rotation,
+            };
+
+            if (data.action === "spawn") {
+                const otherPlayers = players
+                    .filter((player) => player.socket !== ws && player.data !== null)
+                    .map((player) => player.data as NonNullable<typeof player.data>);
+
+                ws.send(
+                    JSON.stringify({
+                        type: "server",
+                        action: "players-list",
+                        target: player.data.uuid,
+                        data: otherPlayers,
+                    } satisfies NetEvent)
+                );
+            }
+        }
+    });
+
+    ws.on("close", () => {
+        players = players.filter((player) => player.socket !== ws);
+        console.log(`Client disconnected. (${players.length})`);
+
+        if (!player.data) {
+            return;
+        }
+
+        const message = JSON.stringify({
+            type: "entity",
+            action: "remove",
+            target: player.data.uuid,
+        } satisfies NetEvent);
+
+        players.forEach(({ socket }) => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+            }
+        });
+    });
+});
+
+// Function to close all active sockets gracefully
+function closeAllSockets() {
+    console.log("Shutting down...");
+    players.forEach(({ socket }) => {
+        socket.close(1000, "Server shutting down");
+    });
+
+    players = [];
+}
+
+// Function to handle shutdown signals
+function handleShutdown() {
+    closeAllSockets();
+
+    server.close(() => {
+        console.log("Server closed.");
+        process.exit(0);
+    });
+}
+
+process.on("SIGINT", handleShutdown);
+process.on("SIGTERM", handleShutdown);
+
+console.log("Ready on ws://localhost:8080");
