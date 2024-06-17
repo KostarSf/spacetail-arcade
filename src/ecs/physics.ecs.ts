@@ -106,7 +106,7 @@ export class PhysicsSystem extends System {
         this.query = world.query([SolidBodyComponent]);
     }
 
-    update(elapsedMs: number): void {
+    update(_elapsedMs: number): void {
         let body: SolidBodyComponent;
         let motion: MotionComponent;
         let transform: TransformComponent;

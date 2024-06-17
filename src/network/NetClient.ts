@@ -7,6 +7,12 @@ class NetClient {
         return this._isHost;
     }
 
+    private _offline: boolean = false;
+
+    public get offline() {
+        return this._offline;
+    }
+
     private socket: WebSocket;
 
     private pendingEvents: NetEvent[] = [];
@@ -21,6 +27,8 @@ class NetClient {
         this.socket = new WebSocket("ws://localhost:8080");
 
         this.socket.onopen = () => {
+            this._offline = false;
+
             for (const event of this.pendingEvents) {
                 this.socket.send(JSON.stringify(event));
             }
@@ -29,7 +37,9 @@ class NetClient {
         };
 
         this.socket.onclose = (ev) => {
+            this._offline = true;
             console.log(ev);
+
             setTimeout(() => this.openSocket(), 1000);
         };
 

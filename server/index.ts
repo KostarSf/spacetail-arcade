@@ -1,5 +1,3 @@
-import { setTimeout } from "node:timers/promises";
-
 import WebSocket from "ws";
 
 import type { NetEvent } from "../src/network/events";
