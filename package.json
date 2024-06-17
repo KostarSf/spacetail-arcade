@@ -1,6 +1,6 @@
 {
-  "name": "template-ts-vite",
-  "version": "1.1.0",
+  "name": "spacetail-v2",
+  "version": "0.0.1",
   "description": "Excalibur TypeScript template for Vite",
   "main": "index.js",
   "scripts": {
