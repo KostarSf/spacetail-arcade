@@ -19,6 +19,7 @@ import { ShipSystem } from "./ecs/ship.ecs";
 import { Decal } from "./entities/decal";
 import { netClient } from "./network/NetClient";
 import { Resources, loader } from "./resources";
+import { PhysicsSystem } from "./ecs/physics.ecs";
 
 const rand = new Random(256);
 
@@ -54,6 +55,7 @@ class GameLevel extends Scene {
     }
 
     onActivate(context: SceneActivationContext<unknown>): void {
+        this.world.add(PhysicsSystem);
         this.world.add(ShipSystem);
         this.uuidEntitiesQuery = this.world.query([UuidComponent]);
 
@@ -109,6 +111,7 @@ class GameLevel extends Scene {
                         vel: vec(...event.data.vel),
                         rotation: event.data.rotation,
                     });
+                    otherPlayer.addTag("player");
                     this.add(otherPlayer);
 
                     return;
@@ -122,8 +125,12 @@ class GameLevel extends Scene {
                 otherPlayer.vel.setTo(...event.data.vel);
                 otherPlayer.rotation = event.data.rotation;
 
+                if (event.action === "update") {
+                    // do nothing here
+                }
+
                 if (event.action === "rotated") {
-                    // do nothing yet
+                    // do nothing here
                 }
 
                 if (event.action === "fire") {
@@ -151,7 +158,12 @@ class GameLevel extends Scene {
                     }
                 });
 
-                otherPlayers.map((options) => new Ship(options)).forEach((ship) => this.add(ship));
+                otherPlayers
+                    .map((options) => new Ship(options))
+                    .forEach((ship) => {
+                        ship.addTag("player");
+                        this.add(ship);
+                    });
             }
         });
     }
@@ -169,6 +181,21 @@ class GameLevel extends Scene {
         const player = new Player({ pos: vec(randPos(), randPos()) });
         this.add(player);
 
+        if (netClient.isHost) {
+            this.prepareWorld();
+        }
+
+        netClient.send({
+            type: "player",
+            action: "spawn",
+            target: player.uuid,
+            data: {
+                ...player.serialize(),
+            },
+        });
+    }
+
+    private prepareWorld() {
         const asteroidSpawns = [
             vec(10, 30),
             vec(140, -40),
@@ -185,15 +212,6 @@ class GameLevel extends Scene {
         );
         asteroidOptions.forEach((options) => {
             this.add(new Asteroid(options));
-        });
-
-        netClient.send({
-            type: "player",
-            action: "spawn",
-            target: player.uuid,
-            data: {
-                ...player.serialize(),
-            },
         });
     }
 }

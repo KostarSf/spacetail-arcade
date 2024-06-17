@@ -1,6 +1,6 @@
-import { Engine, Keys, PointerButton, Vector } from "excalibur";
+import { Engine, Keys, PointerButton } from "excalibur";
 import { netClient } from "../network/NetClient";
-import { easeOut, lerp } from "../utils/interpolate";
+import { easeOut, lerp, round, vecToArray } from "../utils/math";
 import { Bullet } from "./bullet";
 import { Ship, ShipOptions } from "./ship";
 
@@ -8,7 +8,9 @@ export class Player extends Ship {
     private isMouseControl: boolean = true;
 
     constructor(options: ShipOptions) {
-        super(options);
+        super({ ...options, name: options.name ?? "Player" });
+        this.addTag("player");
+        this.addTag("client-player");
     }
 
     override set accelerated(value: boolean) {
@@ -142,13 +144,9 @@ export class Player extends Ship {
 
     public serialize() {
         return {
-            pos: this.vecToArray(this.pos),
-            vel: this.vecToArray(this.vel),
-            rotation: Number(this.rotation.toFixed(2)),
+            pos: vecToArray(this.pos, 2),
+            vel: vecToArray(this.vel, 2),
+            rotation: round(this.rotation, 2),
         };
-    }
-
-    private vecToArray(vector: Vector): [number, number] {
-        return [Number(vector.x.toFixed(2)), Number(vector.y.toFixed(2))];
     }
 }

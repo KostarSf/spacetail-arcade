@@ -1,4 +1,12 @@
+import { NetEvent } from "./events";
+
 class NetClient {
+    private _isHost: boolean = false;
+
+    public get isHost() {
+        return this._isHost;
+    }
+
     private socket: WebSocket;
 
     private pendingEvents: NetEvent[] = [];
@@ -29,20 +37,36 @@ class NetClient {
             console.error(ev);
         };
 
-        this.socket.onmessage = async (event: MessageEvent<Blob | string>) => {
-            if (!this.onMessageCallback) {
-                return;
-            }
-
+        this.socket.onmessage = async (message: MessageEvent<Blob | string>) => {
             try {
-                const data = typeof event.data === "string" ? event.data : await event.data.text();
-                this.onMessageCallback(JSON.parse(data));
+                const event = await this.parseEvent(message);
+                const processed = this.processIfServiceEvent(event);
+
+                if (processed || !this.onMessageCallback) {
+                    return;
+                }
+
+                this.onMessageCallback(event);
             } catch (error) {
                 console.error(error);
             }
         };
 
         return this.socket;
+    }
+
+    private async parseEvent(event: MessageEvent<Blob | string>): Promise<NetEvent> {
+        const data = typeof event.data === "string" ? event.data : await event.data.text();
+        return JSON.parse(data);
+    }
+
+    private processIfServiceEvent(event: NetEvent) {
+        if (event.type !== "server" || event.action !== "set-host") {
+            return false;
+        }
+
+        this._isHost = event.data.isHost;
+        return true;
     }
 
     onMessage(callback: (event: NetEvent) => void) {
@@ -60,105 +84,3 @@ class NetClient {
 }
 
 export const netClient = new NetClient();
-
-export type NetEntityEvent = {
-    type: "entity";
-    target: string;
-} & (
-    | {
-          action: "update";
-          data: {
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | { action: "remove" }
-);
-
-export type NetShipEvent = {
-    type: "ship";
-    target: string;
-};
-// & (
-//     | {
-//           action: "fire";
-//           data: {
-//               object: "Bullet";
-//               objectPos: [number, number];
-//               objectVel: [number, number];
-//               pos: [number, number];
-//               vel: [number, number];
-//               rotation: number;
-//           };
-//       }
-//     | {
-//           action: "accelerated";
-//           data: {
-//               value: boolean;
-//               pos: [number, number];
-//               vel: [number, number];
-//               rotation: number;
-//           };
-//       }
-//     | {
-//           action: "rotated";
-//           data: {
-//               pos: [number, number];
-//               vel: [number, number];
-//               rotation: number;
-//           };
-//       }
-// );
-
-export type NetPlayerEvent = {
-    type: "player";
-    target: string;
-} & (
-    | {
-          action: "spawn";
-          data: {
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | {
-          action: "fire";
-          data: {
-              object: "Bullet";
-              objectPos: [number, number];
-              objectVel: [number, number];
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | {
-          action: "accelerated";
-          data: {
-              value: boolean;
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | {
-          action: "rotated";
-          data: {
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-);
-
-export type NetServerEvent = {
-    type: "server";
-    target: string;
-} & {
-    action: "players-list";
-    data: { uuid: string; pos: [number, number]; vel: [number, number]; rotation: number }[];
-};
-
-export type NetEvent = NetShipEvent | NetPlayerEvent | NetEntityEvent | NetServerEvent;

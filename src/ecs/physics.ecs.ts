@@ -7,9 +7,16 @@ import {
     Entity,
     MotionComponent,
     PreCollisionEvent,
+    Query,
+    System,
+    SystemPriority,
+    SystemType,
     TransformComponent,
+    Vector,
+    World,
 } from "excalibur";
 import { netClient } from "../network/NetClient";
+import { round, vecToArray } from "../utils/math";
 import { UuidComponent } from "./UuidComponent";
 
 export interface SolidBodyOptions {
@@ -18,6 +25,16 @@ export interface SolidBodyOptions {
 
 export class SolidBodyComponent extends Component {
     public mass: number;
+
+    public nextVel: Vector | null = null;
+
+    get pos() {
+        return this.owner?.get(TransformComponent).pos!;
+    }
+
+    get vel() {
+        return this.owner?.get(MotionComponent).vel!;
+    }
 
     readonly dependencies = [MotionComponent, BodyComponent, ColliderComponent, UuidComponent];
 
@@ -37,46 +54,89 @@ export class SolidBodyComponent extends Component {
                 return;
             }
 
-            const thisBody = precollision.target.owner.get(SolidBodyComponent);
-            const thisTransform = precollision.target.owner.get(TransformComponent);
-            const thisMotion = precollision.target.owner.get(MotionComponent);
+            const target = precollision.target.owner;
+            const other = precollision.other.owner;
 
-            const otherBody = precollision.other.owner.get(SolidBodyComponent);
-            const otherTransform = precollision.other.owner.get(TransformComponent);
-            const otherMotion = precollision.other.owner.get(MotionComponent);
+            if (!netClient.isHost) {
+                return;
+            }
 
-            const collisionDirection = otherTransform.pos.sub(thisTransform.pos);
+            const thisBody = target.get(SolidBodyComponent);
+            const otherBody = other.get(SolidBodyComponent);
+
+            const collisionDirection = otherBody.pos.sub(thisBody.pos);
             if (collisionDirection.squareDistance() === 0) {
                 return;
             }
 
             const collisionNormal = collisionDirection.normalize();
 
-            const relativeVelocity = otherMotion.vel.sub(thisMotion.vel);
+            const relativeVelocity = otherBody.vel.sub(thisBody.vel);
             const velocityAlongNormal = relativeVelocity.dot(collisionNormal);
 
             if (velocityAlongNormal > 0) {
                 return;
             }
 
-            const restitution = 0.5;
+            const restitution = 0.2;
             const impulseScalar =
                 (-(1 + restitution) * velocityAlongNormal) /
                 (1 / thisBody.mass + 1 / otherBody.mass);
 
             const impulse = collisionNormal.scale(impulseScalar);
-            thisMotion.vel = thisMotion.vel.sub(impulse.scale(1 / thisBody.mass));
+
+            thisBody.nextVel = thisBody.vel.sub(impulse.scale(1 / thisBody.mass));
+        });
+    }
+}
+
+export class PhysicsSystem extends System {
+    public systemType: SystemType = SystemType.Update;
+    public priority: number = SystemPriority.Average;
+
+    private query: Query<
+        | typeof SolidBodyComponent
+        | typeof MotionComponent
+        | typeof UuidComponent
+        | typeof TransformComponent
+    >;
+
+    constructor(world: World) {
+        super();
+        this.query = world.query([SolidBodyComponent]);
+    }
+
+    update(elapsedMs: number): void {
+        let body: SolidBodyComponent;
+        let motion: MotionComponent;
+        let transform: TransformComponent;
+        let uuid: UuidComponent;
+
+        const entities = this.query.entities;
+        for (let i = 0; i < entities.length; i++) {
+            body = entities[i].get(SolidBodyComponent);
+
+            if (body.nextVel === null) {
+                continue;
+            }
+
+            motion = entities[i].get(MotionComponent);
+            transform = entities[i].get(TransformComponent);
+            uuid = entities[i].get(UuidComponent);
+
+            motion.vel = body.nextVel;
+            body.nextVel = null;
 
             netClient.send({
-                type: "entity",
+                type: entities[i].hasTag("player") ? "player" : "entity",
                 action: "update",
-                target: precollision.target.owner.get(UuidComponent).uuid,
+                target: uuid.uuid,
                 data: {
-                    pos: [thisTransform.pos.x, thisTransform.pos.y],
-                    vel: [thisMotion.vel.x, thisMotion.vel.y],
-                    rotation: thisTransform.rotation,
+                    pos: vecToArray(transform.pos, 2),
+                    vel: vecToArray(motion.vel, 2),
+                    rotation: round(transform.rotation, 2),
                 },
             });
-        });
+        }
     }
 }

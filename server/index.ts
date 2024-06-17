@@ -1,10 +1,14 @@
+import { setTimeout } from "node:timers/promises";
+
 import WebSocket from "ws";
-import type { NetEvent } from "../src/network/NetClient";
+
+import type { NetEvent } from "../src/network/events";
 
 const server = new WebSocket.Server({ port: 8080 });
 
 let players: {
     socket: WebSocket;
+    isHost: boolean;
     data: {
         uuid: string;
         pos: [number, number];
@@ -14,12 +18,13 @@ let players: {
 }[] = [];
 
 server.on("connection", (ws) => {
-    const player: (typeof players)[number] = { socket: ws, data: null };
-    const length = players.push(player);
+    const player: (typeof players)[number] = { socket: ws, data: null, isHost: false };
+    players.push(player);
 
-    console.log(`New client connected (${length})`);
+    console.log(`New client connected (${players.length})`);
+    setNewHostIfNeeded();
 
-    ws.on("message", (message) => {
+    ws.on("message", async (message) => {
         players.forEach(({ socket }) => {
             if (socket !== ws && socket.readyState === WebSocket.OPEN) {
                 socket.send(message);
@@ -56,6 +61,8 @@ server.on("connection", (ws) => {
         players = players.filter((player) => player.socket !== ws);
         console.log(`Client disconnected. (${players.length})`);
 
+        setNewHostIfNeeded();
+
         if (!player.data) {
             return;
         }
@@ -74,7 +81,28 @@ server.on("connection", (ws) => {
     });
 });
 
-// Function to close all active sockets gracefully
+function setNewHostIfNeeded() {
+    const hostPlayer = players.find((player) => player.isHost);
+    if (hostPlayer) {
+        return;
+    }
+
+    const newHost = players.at(0);
+    if (!newHost) {
+        return;
+    }
+
+    newHost.isHost = true;
+    newHost.socket.send(
+        JSON.stringify({
+            type: "server",
+            action: "set-host",
+            target: "none",
+            data: { isHost: true },
+        } satisfies NetEvent)
+    );
+}
+
 function closeAllSockets() {
     console.log("Shutting down...");
     players.forEach(({ socket }) => {
@@ -84,7 +112,6 @@ function closeAllSockets() {
     players = [];
 }
 
-// Function to handle shutdown signals
 function handleShutdown() {
     closeAllSockets();
 

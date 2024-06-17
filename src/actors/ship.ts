@@ -10,6 +10,7 @@ export interface ShipOptions {
     pos?: Vector | [number, number];
     vel?: Vector | [number, number];
     rotation?: number;
+    name?: string;
 }
 
 export class Ship extends Actor {
@@ -22,7 +23,7 @@ export class Ship extends Actor {
             pos: Array.isArray(options.pos) ? vec(...options.pos) : options.pos,
             vel: Array.isArray(options.vel) ? vec(...options.vel) : options.vel,
             rotation: options.rotation,
-
+            name: options.name ?? "Ship",
             collider: new PolygonCollider({
                 points: [vec(-10, -10), vec(15, 0), vec(-10, 10)],
             }),
