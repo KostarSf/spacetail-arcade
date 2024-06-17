@@ -3,6 +3,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runGameServer } from "./game-server";
+import morgan from "morgan";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +11,8 @@ const PORT = process.env.PORT || 3000;
 app.use(compression());
 
 app.disable("x-powered-by");
+
+app.use(morgan("tiny"));
 
 if (process.env.NODE_ENV === "production") {
     const __filename = fileURLToPath(import.meta.url);
