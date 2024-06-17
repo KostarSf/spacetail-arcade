@@ -1,125 +1,29 @@
-import WebSocket from "ws";
+import compression from "compression";
+import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { runGameServer } from "./game-server";
 
-import type { NetEvent } from "../src/network/events";
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const server = new WebSocket.Server({ port: 8080 });
+app.use(compression());
 
-let players: {
-    socket: WebSocket;
-    isHost: boolean;
-    data: {
-        uuid: string;
-        pos: [number, number];
-        vel: [number, number];
-        rotation: number;
-    } | null;
-}[] = [];
+app.disable("x-powered-by");
 
-server.on("connection", (ws) => {
-    const player: (typeof players)[number] = { socket: ws, data: null, isHost: false };
-    players.push(player);
+if (process.env.NODE_ENV === "production") {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
 
-    console.log(`New client connected (${players.length})`);
-    setNewHostIfNeeded();
+    app.use("/assets", express.static("dist/client/assets", { immutable: true, maxAge: "1y" }));
 
-    ws.on("message", async (message) => {
-        players.forEach(({ socket }) => {
-            if (socket !== ws && socket.readyState === WebSocket.OPEN) {
-                socket.send(message);
-            }
-        });
-
-        const data = JSON.parse(message.toString()) as NetEvent;
-        if (data.type === "player") {
-            player.data = {
-                uuid: data.target,
-                pos: data.data.pos,
-                vel: data.data.vel,
-                rotation: data.data.rotation,
-            };
-
-            if (data.action === "spawn") {
-                const otherPlayers = players
-                    .filter((player) => player.socket !== ws && player.data !== null)
-                    .map((player) => player.data as NonNullable<typeof player.data>);
-
-                ws.send(
-                    JSON.stringify({
-                        type: "server",
-                        action: "players-list",
-                        target: player.data.uuid,
-                        data: otherPlayers,
-                    } satisfies NetEvent)
-                );
-            }
-        }
+    app.get("/", (_req, res) => {
+        res.sendFile(path.join(__dirname, "../client/index.html"));
     });
+}
 
-    ws.on("close", () => {
-        players = players.filter((player) => player.socket !== ws);
-        console.log(`Client disconnected. (${players.length})`);
+app.listen(PORT, () => {
+    console.log(`Express server is running on port ${PORT}`);
 
-        setNewHostIfNeeded();
-
-        if (!player.data) {
-            return;
-        }
-
-        const message = JSON.stringify({
-            type: "entity",
-            action: "remove",
-            target: player.data.uuid,
-        } satisfies NetEvent);
-
-        players.forEach(({ socket }) => {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(message);
-            }
-        });
-    });
+    runGameServer();
 });
-
-function setNewHostIfNeeded() {
-    const hostPlayer = players.find((player) => player.isHost);
-    if (hostPlayer) {
-        return;
-    }
-
-    const newHost = players.at(0);
-    if (!newHost) {
-        return;
-    }
-
-    newHost.isHost = true;
-    newHost.socket.send(
-        JSON.stringify({
-            type: "server",
-            action: "set-host",
-            target: "none",
-            data: { isHost: true },
-        } satisfies NetEvent)
-    );
-}
-
-function closeAllSockets() {
-    console.log("Shutting down...");
-    players.forEach(({ socket }) => {
-        socket.close(1000, "Server shutting down");
-    });
-
-    players = [];
-}
-
-function handleShutdown() {
-    closeAllSockets();
-
-    server.close(() => {
-        console.log("Server closed.");
-        process.exit(0);
-    });
-}
-
-process.on("SIGINT", handleShutdown);
-process.on("SIGTERM", handleShutdown);
-
-console.log("Ready on ws://localhost:8080");
