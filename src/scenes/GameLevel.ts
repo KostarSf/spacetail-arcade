@@ -378,7 +378,7 @@ export class GameLevel extends Scene {
             this.world.entities.length;
     }
 
-    onPostDraw(ctx: ExcaliburGraphicsContext, delta: number): void {
+    onPostDraw(ctx: ExcaliburGraphicsContext, _delta: number): void {
         const mapSize = 64;
         const mapOffset = 32;
         const offset = vec(mapOffset, mapOffset);
