@@ -19,6 +19,7 @@ export class Player extends Ship {
                 type: "player",
                 target: this.uuid,
                 action: "accelerated",
+                time: Date.now(),
                 data: {
                     value: value,
                     ...this.serialize(),
@@ -40,8 +41,10 @@ export class Player extends Ship {
             type: "player",
             target: this.uuid,
             action: "fire",
+            time: Date.now(),
             data: {
                 object: "Bullet",
+                objectUuid: bullet.uuid,
                 objectPos: [bullet.pos.x, bullet.pos.y],
                 objectVel: [bullet.vel.x, bullet.vel.y],
                 ...this.serialize(),
@@ -86,11 +89,11 @@ export class Player extends Ship {
             }
         });
 
-        // engine.currentScene.camera.strategy.elasticToActor(this, 0.1, 0.8);
         engine.currentScene.camera.strategy.radiusAroundActor(this, 50);
     }
 
-    onPostUpdate(engine: Engine, delta: number): void {
+    onPostUpdate(engine: Engine, elapsedMs: number): void {
+        const delta = elapsedMs / 1000;
         this.updateInputControlls(engine, delta);
         this.updateCameraZoom(engine, delta);
     }
@@ -114,7 +117,7 @@ export class Player extends Ship {
             const rotationTarget = engine.screenToWorldCoordinates(cursorScreenPos);
             newRotation = rotationTarget.sub(this.pos).toAngle();
         } else {
-            newRotation = this.rotation + (rotationMoment / delta) * 0.2;
+            newRotation = this.rotation + rotationMoment * delta * 4;
         }
 
         this.rotation = newRotation;
@@ -125,9 +128,8 @@ export class Player extends Ship {
                 type: "player",
                 target: this.uuid,
                 action: "rotated",
-                data: {
-                    ...this.serialize(),
-                },
+                time: Date.now(),
+                data: this.serialize(),
             });
         }
     }
@@ -139,7 +141,7 @@ export class Player extends Ship {
         const newZoom = 1.1 - zoomFactor * 0.4;
 
         const lastZoom = engine.currentScene.camera.zoom;
-        engine.currentScene.camera.zoom = lastZoom + (newZoom - lastZoom) / (delta * 5);
+        engine.currentScene.camera.zoom = lastZoom + (newZoom - lastZoom) * delta * 2;
     }
 
     public serialize() {

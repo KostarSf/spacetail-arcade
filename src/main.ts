@@ -16,6 +16,7 @@ class Game extends Engine {
                     scene: GameLevel,
                 },
             },
+            fixedUpdateFps: 50,
         });
     }
 

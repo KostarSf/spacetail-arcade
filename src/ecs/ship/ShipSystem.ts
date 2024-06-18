@@ -1,5 +1,4 @@
 import {
-    Component,
     MotionComponent,
     Query,
     System,
@@ -9,18 +8,7 @@ import {
     Vector,
     World,
 } from "excalibur";
-
-export class ShipComponent extends Component {
-    accelerated: boolean = false;
-
-    rotationTarget: Vector | null = null;
-
-    readonly dependencies = [TransformComponent, MotionComponent];
-
-    constructor() {
-        super();
-    }
-}
+import { ShipComponent } from "./ShipComponent";
 
 export class ShipSystem extends System {
     public systemType: SystemType = SystemType.Update;
@@ -38,6 +26,9 @@ export class ShipSystem extends System {
         let motion: MotionComponent;
         let ship: ShipComponent;
 
+        const delta = elapsedMs / 1000;
+        const decay = Math.pow(0.9, delta);
+
         const entities = this.query.entities;
         for (let i = 0; i < entities.length; i++) {
             transform = entities[i].get(TransformComponent);
@@ -49,10 +40,10 @@ export class ShipSystem extends System {
             }
 
             if (ship.accelerated) {
-                motion.vel.addEqual(Vector.fromAngle(transform.rotation).scale(20 / elapsedMs));
-            } else {
-                motion.vel.scaleEqual(0.998);
+                motion.vel.addEqual(Vector.fromAngle(transform.rotation).scale(300 * delta));
             }
+
+            motion.vel.scaleEqual(decay);
         }
     }
 }

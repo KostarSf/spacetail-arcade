@@ -1,17 +1,17 @@
 import {
     Actor,
+    Color,
     Engine,
-    Text,
+    Font,
+    FontUnit,
     MotionComponent,
     Query,
     Scene,
     SceneActivationContext,
     ScreenElement,
+    Text,
     TransformComponent,
     vec,
-    Color,
-    Font,
-    FontUnit,
 } from "excalibur";
 import { Asteroid, AsteroidOptions } from "../actors/asteroid";
 import { Bullet } from "../actors/bullet";
@@ -19,7 +19,7 @@ import { Player } from "../actors/player";
 import { Ship } from "../actors/ship";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { PhysicsSystem } from "../ecs/physics.ecs";
-import { ShipSystem } from "../ecs/ship.ecs";
+import { ShipSystem } from "~/ecs/ship/ShipSystem";
 import { Decal } from "../entities/decal";
 import { netClient } from "../network/NetClient";
 import { Resources } from "../resources";
@@ -29,6 +29,7 @@ export class GameLevel extends Scene {
     private uuidEntitiesQuery!: Query<typeof UuidComponent>;
 
     private offlineLabel: Actor;
+    private isHostLabel: Actor;
 
     constructor() {
         super();
@@ -45,6 +46,22 @@ export class GameLevel extends Scene {
                     size: 24,
                     unit: FontUnit.Px,
                     color: Color.Red,
+                }),
+            })
+        );
+
+        this.isHostLabel = new ScreenElement({
+            pos: vec(0, 10),
+        });
+
+        this.isHostLabel.graphics.use(
+            new Text({
+                text: "host",
+                font: new Font({
+                    family: "consolas",
+                    size: 24,
+                    unit: FontUnit.Px,
+                    color: Color.Yellow,
                 }),
             })
         );
@@ -81,6 +98,20 @@ export class GameLevel extends Scene {
                 transform.pos.setTo(...event.data.pos);
                 transform.rotation = event.data.rotation;
                 motion.vel.setTo(...event.data.vel);
+            }
+
+            if (event.type === "entity" && event.action === "spawn") {
+                const entityExisted = this.uuidEntitiesQuery.entities.find(
+                    (entity) => entity.get(UuidComponent).uuid === event.target
+                );
+                if (entityExisted) {
+                    entityExisted.kill();
+                }
+
+                if (event.data.class === "Asteroid") {
+                    const asteroid = new Asteroid(event.data.args);
+                    this.add(asteroid);
+                }
             }
 
             if (event.type === "player") {
@@ -121,6 +152,7 @@ export class GameLevel extends Scene {
                 if (event.action === "fire") {
                     this.add(
                         new Bullet({
+                            uuid: event.data.objectUuid,
                             actor: otherPlayer,
                             pos: vec(...event.data.objectPos),
                             vel: vec(...event.data.objectVel),
@@ -150,6 +182,23 @@ export class GameLevel extends Scene {
                         this.add(ship);
                     });
             }
+
+            if (event.type === "server" && event.action === "entities-list") {
+                const entitiesForDeletion = this.uuidEntitiesQuery.entities.filter(
+                    (existedEntity) =>
+                        event.data.findIndex(
+                            (entity) => entity.args.uuid === existedEntity.get(UuidComponent).uuid
+                        ) !== -1
+                );
+
+                entitiesForDeletion.forEach((entity) => entity.kill());
+
+                event.data.forEach((entity) => {
+                    if (entity.class === "Asteroid") {
+                        this.add(new Asteroid(entity.args));
+                    }
+                });
+            }
         });
     }
 
@@ -167,6 +216,7 @@ export class GameLevel extends Scene {
         this.add(player);
 
         this.add(this.offlineLabel);
+        this.add(this.isHostLabel);
 
         if (netClient.isHost) {
             this.prepareWorld();
@@ -176,9 +226,8 @@ export class GameLevel extends Scene {
             type: "player",
             action: "spawn",
             target: player.uuid,
-            data: {
-                ...player.serialize(),
-            },
+            time: Date.now(),
+            data: player.serialize(),
         });
     }
 
@@ -202,7 +251,8 @@ export class GameLevel extends Scene {
         });
     }
 
-    onPostUpdate(engine: Engine<any>, delta: number): void {
+    onPostUpdate(_engine: Engine<any>, _delta: number): void {
         this.offlineLabel.graphics.visible = netClient.offline;
+        this.isHostLabel.graphics.visible = netClient.isHost;
     }
 }

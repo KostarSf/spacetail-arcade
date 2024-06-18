@@ -127,10 +127,13 @@ export class PhysicsSystem extends System {
             motion.vel = body.nextVel;
             body.nextVel = null;
 
+            const isPlayer = entities[i].hasTag("player");
+
             netClient.send({
-                type: entities[i].hasTag("player") ? "player" : "entity",
+                type: isPlayer ? "player" : "entity",
                 action: "update",
                 target: uuid.uuid,
+                time: Date.now(),
                 data: {
                     pos: vecToArray(transform.pos, 2),
                     vel: vecToArray(motion.vel, 2),

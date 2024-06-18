@@ -1,6 +1,17 @@
+import { AsteroidSerialize } from "~/actors/asteroid";
+
+export type AsteroidEntityEventData = {
+    class: "Asteroid";
+    time: number;
+    args: AsteroidSerialize;
+};
+
+export type EntityEventData = AsteroidEntityEventData;
+
 export type NetEntityEvent = {
     type: "entity";
     target: string;
+    time: number;
 } & (
     | {
           action: "update";
@@ -11,11 +22,16 @@ export type NetEntityEvent = {
           };
       }
     | { action: "remove" }
+    | {
+          action: "spawn";
+          data: AsteroidEntityEventData;
+      }
 );
 
 export type NetPlayerEvent = {
     type: "player";
     target: string;
+    time: number;
 } & (
     | {
           action: "update";
@@ -37,6 +53,7 @@ export type NetPlayerEvent = {
           action: "fire";
           data: {
               object: "Bullet";
+              objectUuid: string;
               objectPos: [number, number];
               objectVel: [number, number];
               pos: [number, number];
@@ -66,6 +83,7 @@ export type NetPlayerEvent = {
 export type NetServerEvent = {
     type: "server";
     target: string;
+    time: number;
 } & (
     | {
           action: "set-host";
@@ -76,6 +94,10 @@ export type NetServerEvent = {
     | {
           action: "players-list";
           data: { uuid: string; pos: [number, number]; vel: [number, number]; rotation: number }[];
+      }
+    | {
+          action: "entities-list";
+          data: EntityEventData[];
       }
 );
 

@@ -26,6 +26,18 @@ export function vecToArray(vector: Vector, fractionDigits?: number): [number, nu
     return [vector.x, vector.y];
 }
 
+export function vec(param1: number | Vector | [number, number], param2?: number): Vector {
+    if (typeof param1 === "number") {
+        return new Vector(param1, param2!);
+    }
+
+    if (Array.isArray(param1)) {
+        return new Vector(...param1);
+    }
+
+    return param1;
+}
+
 export function round(value: number, fractionDigits: number) {
     return Number(value.toFixed(fractionDigits));
 }

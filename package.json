@@ -4,7 +4,7 @@
   "description": "Excalibur TypeScript template for Vite",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"tsx watch ./server/index.ts\"",
+    "dev": "concurrently \"vite --host\" \"tsx watch ./server/index.ts\"",
     "start": "npm run dev",
     "build": "tsc && vite build && vite build --ssr ./server/index.ts",
     "test": "npm run build && ex-test -d ./dist -t ./test/test.js",

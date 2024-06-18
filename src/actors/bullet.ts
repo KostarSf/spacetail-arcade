@@ -1,8 +1,11 @@
 import { Actor, CollisionType, Entity, Vector } from "excalibur";
+import { UuidComponent } from "~/ecs/UuidComponent";
+import { netClient } from "~/network/NetClient";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Animations } from "../resources";
 
 export interface BulletOptions {
+    uuid?: string;
     actor: Entity;
     pos: Vector;
     vel: Vector;
@@ -10,6 +13,10 @@ export interface BulletOptions {
 
 export class Bullet extends Actor {
     public readonly actor: Entity;
+
+    get uuid() {
+        return this.get(UuidComponent).uuid;
+    }
 
     constructor(options: BulletOptions) {
         super({
@@ -19,6 +26,8 @@ export class Bullet extends Actor {
             radius: 3,
             collisionType: CollisionType.Passive,
         });
+
+        this.addComponent(new UuidComponent(options.uuid));
 
         this.actor = options.actor;
     }
@@ -37,6 +46,19 @@ export class Bullet extends Actor {
 
             this.kill();
             evt.other.kill();
+        });
+
+        this.on("kill", () => {
+            if (!netClient.isHost) {
+                return;
+            }
+
+            netClient.send({
+                type: "entity",
+                action: "remove",
+                target: this.uuid,
+                time: Date.now(),
+            });
         });
 
         this.actions.delay(5000).die();

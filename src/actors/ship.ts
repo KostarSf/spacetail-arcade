@@ -1,7 +1,7 @@
 import { Actor, Engine, PolygonCollider, Vector, vec } from "excalibur";
+import { ShipComponent } from "~/ecs/ship";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
-import { ShipComponent } from "../ecs/ship.ecs";
 import { Resources } from "../resources";
 import { Bullet } from "./bullet";
 
