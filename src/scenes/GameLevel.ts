@@ -4,6 +4,7 @@ import {
     Color,
     CompositeCollider,
     Engine,
+    ExcaliburGraphicsContext,
     Font,
     FontUnit,
     GraphicsGroup,
@@ -15,11 +16,13 @@ import {
     SceneActivationContext,
     ScreenElement,
     Shape,
+    TagQuery,
     Text,
     TransformComponent,
     Vector,
     vec,
 } from "excalibur";
+import { ShipComponent } from "~/ecs/ship";
 import { ShipSystem } from "~/ecs/ship/ShipSystem";
 import { Asteroid, AsteroidOptions } from "../actors/asteroid";
 import { Bullet } from "../actors/bullet";
@@ -30,22 +33,26 @@ import { PhysicsSystem } from "../ecs/physics.ecs";
 import { Decal } from "../entities/decal";
 import { netClient } from "../network/NetClient";
 import { Resources } from "../resources";
-import { rand } from "../utils/math";
+import { linInt, rand } from "../utils/math";
 
 export class GameLevel extends Scene {
     public static readonly worldSize: number = 5000;
 
     public static inBounds(vector: Vector, offset = 0) {
-        const size = GameLevel.worldSize + offset;
+        const size = GameLevel.worldSize - offset;
         return vector.x >= -size && vector.x <= size && vector.y >= -size && vector.y <= size;
     }
 
     private uuidEntitiesQuery!: Query<typeof UuidComponent>;
+    private shipsQuery!: Query<typeof ShipComponent | typeof TransformComponent>;
+    private asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
 
     private offlineLabel: Actor;
     private isHostLabel: Actor;
     private latencyLabel: Actor;
     private latencyLabelText: Text;
+
+    private player!: Player;
 
     constructor() {
         super();
@@ -105,6 +112,8 @@ export class GameLevel extends Scene {
         this.world.add(PhysicsSystem);
         this.world.add(ShipSystem);
         this.uuidEntitiesQuery = this.world.query([UuidComponent]);
+        this.shipsQuery = this.world.query([ShipComponent]);
+        this.asteroidsQuery = this.world.queryTags([Asteroid.Tag]);
 
         netClient.onMessage((event) => {
             if (event.type === "entity" && event.action === "remove") {
@@ -195,6 +204,8 @@ export class GameLevel extends Scene {
                             pos: pos,
                         })
                     );
+
+                    otherPlayer.ship.consumeEnergy(Bullet.energyCost, { force: true });
                 }
 
                 if (event.action === "accelerated") {
@@ -297,8 +308,8 @@ export class GameLevel extends Scene {
         this.add(bordersEntity);
 
         const randPos = () => -100 + Math.random() * 200;
-        const player = new Player({ pos: vec(randPos(), randPos()) });
-        this.add(player);
+        this.player = new Player({ pos: vec(randPos(), randPos()) });
+        this.add(this.player);
 
         this.add(this.offlineLabel);
         this.add(this.isHostLabel);
@@ -311,9 +322,9 @@ export class GameLevel extends Scene {
         netClient.send({
             type: "player",
             action: "spawn",
-            target: player.uuid,
+            target: this.player.uuid,
             time: netClient.getTime(),
-            data: player.serialize(),
+            data: this.player.serialize(),
         });
     }
 
@@ -365,5 +376,57 @@ export class GameLevel extends Scene {
             netClient.timeOffset +
             ", entities: " +
             this.world.entities.length;
+    }
+
+    onPostDraw(ctx: ExcaliburGraphicsContext, delta: number): void {
+        const mapSize = 64;
+        const mapOffset = 32;
+        const offset = vec(mapOffset, mapOffset);
+
+        ctx.drawRectangle(offset, mapSize, mapSize, Color.Transparent, Color.Gray, 2);
+
+        let transform: TransformComponent;
+        let pos: Vector;
+
+        const dark = Color.fromHex("#333333");
+
+        this.asteroidsQuery.entities.forEach((entity) => {
+            transform = entity.get(TransformComponent);
+            if (this.player.pos.squareDistance(transform.pos) > 6250000) {
+                // 2500^2
+                return;
+            }
+
+            pos = vec(
+                linInt(transform.pos.x, -GameLevel.worldSize, GameLevel.worldSize, 0, mapSize - 2),
+                linInt(transform.pos.y, -GameLevel.worldSize, GameLevel.worldSize, 0, mapSize - 2)
+            ).addEqual(offset);
+
+            ctx.drawRectangle(pos, 1, 1, dark);
+        });
+
+        this.shipsQuery.entities.forEach((entity) => {
+            transform = entity.get(TransformComponent);
+            if (
+                entity.hasTag(Player.Tag) ||
+                this.player.pos.squareDistance(transform.pos) > 6250000 // 2500^2
+            ) {
+                return;
+            }
+
+            pos = vec(
+                linInt(transform.pos.x, -GameLevel.worldSize, GameLevel.worldSize, 0, mapSize - 2),
+                linInt(transform.pos.y, -GameLevel.worldSize, GameLevel.worldSize, 0, mapSize - 2)
+            ).addEqual(offset);
+
+            ctx.drawRectangle(pos, 4, 4, Color.Red);
+        });
+
+        pos = vec(
+            linInt(this.player.pos.x, -GameLevel.worldSize, GameLevel.worldSize, 0, mapSize - 2),
+            linInt(this.player.pos.y, -GameLevel.worldSize, GameLevel.worldSize, 0, mapSize - 2)
+        ).addEqual(offset);
+
+        ctx.drawRectangle(pos, 2, 2, Color.Cyan);
     }
 }

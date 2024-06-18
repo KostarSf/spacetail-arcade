@@ -151,7 +151,7 @@ export class PhysicsSystem extends System {
         let transform: TransformComponent;
         let uuid: UuidComponent;
 
-        const offset = GameLevel.worldSize - 5;
+        const offset = GameLevel.worldSize - 16;
 
         const entities = this.query.entities;
         for (let i = 0; i < entities.length; i++) {
@@ -161,7 +161,7 @@ export class PhysicsSystem extends System {
             transform = entities[i].get(TransformComponent);
             uuid = entities[i].get(UuidComponent);
 
-            const inBounds = GameLevel.inBounds(transform.pos, 5);
+            const inBounds = GameLevel.inBounds(transform.pos, -8);
 
             if (body.nextVel === null && inBounds) {
                 continue;

@@ -98,7 +98,7 @@ export class Ship extends Actor {
         return bullet;
     }
 
-    private get ship() {
+    get ship() {
         return this.get(ShipComponent);
     }
 

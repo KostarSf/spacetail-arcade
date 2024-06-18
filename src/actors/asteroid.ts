@@ -17,6 +17,8 @@ export interface AsteroidOptions {
 export type AsteroidSerialize = ReturnType<(typeof Asteroid)["prototype"]["serialize"]>;
 
 export class Asteroid extends Actor {
+    public static readonly Tag: string = "asteroid";
+
     get uuid() {
         return this.get(UuidComponent).uuid;
     }
@@ -36,6 +38,8 @@ export class Asteroid extends Actor {
 
         this.addComponent(new UuidComponent(options.uuid));
         this.addComponent(new SolidBodyComponent({ mass: options.mass }));
+
+        this.addTag(Asteroid.Tag);
     }
 
     onInitialize(_engine: Engine): void {
