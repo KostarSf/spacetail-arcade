@@ -47,8 +47,12 @@ export class GameLevel extends Scene {
     private shipsQuery!: Query<typeof ShipComponent | typeof TransformComponent>;
     private asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
 
+    private playersLabel: Actor;
+    private playersLabelText: Text;
+
     private offlineLabel: Actor;
     private isHostLabel: Actor;
+
     private latencyLabel: Actor;
     private latencyLabelText: Text;
 
@@ -56,6 +60,22 @@ export class GameLevel extends Scene {
 
     constructor() {
         super();
+
+        this.playersLabel = new ScreenElement({
+            pos: vec(32, 10),
+        });
+
+        this.playersLabelText = new Text({
+            text: "players: 0",
+            font: new Font({
+                family: "consolas",
+                size: 12,
+                unit: FontUnit.Px,
+                color: Color.Gray,
+                filtering: ImageFiltering.Pixel,
+            }),
+        });
+        this.playersLabel.graphics.use(this.playersLabelText);
 
         this.offlineLabel = new ScreenElement({
             pos: vec(-100, 10),
@@ -92,7 +112,7 @@ export class GameLevel extends Scene {
         );
 
         this.latencyLabel = new ScreenElement({
-            pos: vec(70, 10),
+            pos: vec(120, 10),
         });
 
         this.latencyLabelText = new Text({
@@ -314,6 +334,7 @@ export class GameLevel extends Scene {
         this.add(this.offlineLabel);
         this.add(this.isHostLabel);
         this.add(this.latencyLabel);
+        this.add(this.playersLabel);
 
         if (netClient.isHost) {
             this.prepareHostWorld();
@@ -376,6 +397,7 @@ export class GameLevel extends Scene {
             netClient.timeOffset +
             ", entities: " +
             this.world.entities.length;
+        this.playersLabelText.text = "players: " + this.shipsQuery.entities.length;
     }
 
     onPostDraw(ctx: ExcaliburGraphicsContext, _delta: number): void {
@@ -383,6 +405,16 @@ export class GameLevel extends Scene {
         const mapOffset = 32;
         const offset = vec(mapOffset, mapOffset);
 
+        const background = Color.Black;
+        background.a = 0.8;
+
+        ctx.drawRectangle(
+            offset.sub(vec(2, 2)),
+            mapSize + 4,
+            mapSize + 4,
+            background,
+            Color.Transparent
+        );
         ctx.drawRectangle(offset, mapSize, mapSize, Color.Transparent, Color.Gray, 2);
 
         let transform: TransformComponent;
