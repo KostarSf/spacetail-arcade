@@ -3,6 +3,7 @@ import {
     CollisionType,
     Color,
     CompositeCollider,
+    EmitterType,
     Engine,
     ExcaliburGraphicsContext,
     Font,
@@ -11,6 +12,7 @@ import {
     ImageFiltering,
     Line,
     MotionComponent,
+    ParticleEmitter,
     Query,
     Scene,
     SceneActivationContext,
@@ -57,6 +59,8 @@ export class GameLevel extends Scene {
     private latencyLabelText: Text;
 
     private player!: Player;
+
+    private starsParticles!: ParticleEmitter;
 
     constructor() {
         super();
@@ -270,13 +274,13 @@ export class GameLevel extends Scene {
         });
     }
 
-    onInitialize(_engine: Engine<any>): void {
+    onInitialize(engine: Engine<any>): void {
         const worldSize = GameLevel.worldSize;
 
         const space = new Decal({
             image: Resources.Space,
             pos: vec(0, 0),
-            parallax: 0.2,
+            parallax: 0.1,
             zoomResist: 1.3,
         });
         this.add(space);
@@ -327,6 +331,25 @@ export class GameLevel extends Scene {
 
         this.add(bordersEntity);
 
+        this.starsParticles = new ParticleEmitter({
+            emitterType: EmitterType.Rectangle,
+            width: engine.drawWidth * 2,
+            height: engine.drawHeight * 2,
+            x: -engine.drawWidth,
+            y: -engine.drawHeight,
+            minAngle: 0,
+            maxAngle: Math.PI * 2,
+            emitRate: 50,
+            fadeFlag: true,
+            minSize: 0.8,
+            maxSize: 1.2,
+            particleLife: 5000,
+            isEmitting: true,
+            opacity: 0.7,
+        });
+
+        engine.currentScene.add(this.starsParticles);
+
         const randPos = () => -100 + Math.random() * 200;
         this.player = new Player({ pos: vec(randPos(), randPos()) });
         this.add(this.player);
@@ -352,16 +375,16 @@ export class GameLevel extends Scene {
     private prepareHostWorld() {
         const asteroidsCount = 200;
 
-        const asteroidSpawns = [
-            vec(-110, -90),
-            vec(20, -160),
-            vec(150, 70),
-            vec(-20, 180),
-            vec(50, 200),
+        const asteroidSpawns: [Vector, Vector][] = [
+            [vec(-110, -90), Vector.Zero],
+            [vec(20, -160), Vector.Zero],
+            [vec(150, 70), Vector.Zero],
+            [vec(-20, 180), Vector.Zero],
+            [vec(50, 200), Vector.Zero],
         ];
 
         for (let i = 0; i < asteroidsCount; i++) {
-            asteroidSpawns.push(
+            asteroidSpawns.push([
                 rand.pickOne([
                     vec(
                         rand.integer(-GameLevel.worldSize, GameLevel.worldSize),
@@ -371,13 +394,15 @@ export class GameLevel extends Scene {
                         rand.integer(100, GameLevel.worldSize) * rand.pickOne([1, -1]),
                         rand.integer(-GameLevel.worldSize, GameLevel.worldSize)
                     ),
-                ])
-            );
+                ]),
+                vec(rand.floating(-50, 50), rand.floating(-50, 50)),
+            ]);
         }
 
         const asteroidOptions = asteroidSpawns.map(
-            (pos): AsteroidOptions => ({
+            ([pos, vel]): AsteroidOptions => ({
                 pos,
+                vel,
                 mass: rand.integer(40, 150),
                 angularVelocity: rand.floating(-0.2, 0.2),
             })
@@ -387,17 +412,19 @@ export class GameLevel extends Scene {
         });
     }
 
-    onPostUpdate(_engine: Engine<any>, _delta: number): void {
+    onPostUpdate(engine: Engine<any>, _delta: number): void {
         this.offlineLabel.graphics.visible = netClient.offline;
         this.isHostLabel.graphics.visible = netClient.isHost;
         this.latencyLabelText.text =
-            "ping: " +
-            netClient.latency +
-            "ms, offset: " +
-            netClient.timeOffset +
-            ", entities: " +
-            this.world.entities.length;
+            "ping: " + netClient.latency + "ms, time offset: " + netClient.timeOffset + "ms";
+        // +
+        // ", entities: " +
+        // this.world.entities.length;
         this.playersLabelText.text = "players: " + this.shipsQuery.entities.length;
+
+        this.starsParticles.transform.pos = this.player.pos.sub(
+            vec(engine.halfDrawWidth, engine.halfDrawHeight)
+        );
     }
 
     onPostDraw(ctx: ExcaliburGraphicsContext, _delta: number): void {

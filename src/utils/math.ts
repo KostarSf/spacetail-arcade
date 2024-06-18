@@ -1,6 +1,6 @@
 import { Random, Vector, clamp } from "excalibur";
 
-export const rand = new Random(256);
+export const rand = new Random();
 
 export function lerp(
     value: number,

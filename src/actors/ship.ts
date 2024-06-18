@@ -1,11 +1,22 @@
-import { Actor, Color, Engine, GraphicsGroup, Line, PolygonCollider, Vector, vec } from "excalibur";
+import {
+    Actor,
+    Color,
+    Engine,
+    Animation,
+    GraphicsGroup,
+    Line,
+    PolygonCollider,
+    Vector,
+    vec,
+} from "excalibur";
 import { ShipComponent } from "~/ecs/ship";
 import { netClient } from "~/network/NetClient";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
-import { Resources } from "../resources";
+import { Animations, Resources } from "../resources";
 import { Bullet } from "./bullet";
 import { linInt } from "~/utils/math";
+import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 
 export interface ShipOptions {
     uuid?: string;
@@ -17,6 +28,7 @@ export interface ShipOptions {
 
 export class Ship extends Actor {
     private energyLine: Line;
+    private jetGraphics!: Animation;
 
     get uuid() {
         return this.get(UuidComponent).uuid;
@@ -46,11 +58,13 @@ export class Ship extends Actor {
     }
 
     onInitialize(_engine: Engine): void {
-        const sprite = Resources.Player.toSprite();
+        this.jetGraphics = Animations.JetStream;
+
         this.graphics.add(
             new GraphicsGroup({
                 members: [
-                    { graphic: sprite, offset: Vector.Zero },
+                    { graphic: ShadowedSprite.from(Resources.Player), offset: Vector.Zero },
+                    { graphic: this.jetGraphics, offset: Vector.Zero },
                     { graphic: this.energyLine, offset: vec(16, 0), useBounds: false },
                 ],
             })
@@ -76,8 +90,10 @@ export class Ship extends Actor {
         const lowEnergy = this.ship.energy < Bullet.energyCost;
         this.energyLine.color = lowEnergy ? Color.Red : Color.Cyan;
 
-        this.energyLine.rotation = -this.rotation - (Math.PI * 0.5);
+        this.energyLine.rotation = -this.rotation - Math.PI * 0.5;
         this.energyLine.end.y = 32 * linInt(this.ship.energy, 0, this.ship.energyLimit);
+
+        this.jetGraphics.opacity = this.ship.accelerated ? 1 : 0;
     }
 
     public fire() {
@@ -89,11 +105,15 @@ export class Ship extends Actor {
             return;
         }
 
-        const pos = this.pos.add(Vector.fromAngle(this.rotation).scale(15));
-        const vel = this.vel.add(Vector.fromAngle(this.rotation).scale(350));
+        const direction = Vector.fromAngle(this.rotation);
+
+        const pos = this.pos.add(direction.scale(15));
+        const vel = this.vel.add(direction.scale(350));
 
         const bullet = new Bullet({ actor: this, pos, vel });
         this.scene.add(bullet);
+
+        this.vel.subEqual(direction.scale(3));
 
         return bullet;
     }

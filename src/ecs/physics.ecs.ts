@@ -16,10 +16,12 @@ import {
     World,
     vec,
 } from "excalibur";
+import { Player } from "~/actors/player";
 import { GameLevel } from "~/scenes/GameLevel";
 import { netClient } from "../network/NetClient";
-import { round, vecToArray } from "../utils/math";
+import { linInt, round, vecToArray } from "../utils/math";
 import { UuidComponent } from "./UuidComponent";
+import { Explosion } from "~/entities/explosion";
 
 export interface SolidBodyOptions {
     mass: number;
@@ -46,7 +48,7 @@ export class SolidBodyComponent extends Component {
         this.mass = options.mass;
     }
 
-    onAdd(owner: Entity<BodyComponent | ColliderComponent>): void {
+    onAdd(owner: Entity<BodyComponent | ColliderComponent | TransformComponent>): void {
         owner.get(BodyComponent).collisionType = CollisionType.Passive;
 
         owner.get(ColliderComponent).events.on("precollision", (evt: any) => {
@@ -93,6 +95,19 @@ export class SolidBodyComponent extends Component {
                 return;
             }
 
+            if (precollision.target.owner.hasTag(Player.Tag)) {
+                const player = precollision.target.owner as Player;
+                const relativeVelocity = precollision.other.owner
+                    .get(MotionComponent)
+                    .vel.sub(player.vel);
+
+                const scale = linInt(relativeVelocity.squareDistance(), 0, 100_000, 0, 1);
+                const power = scale * 10;
+                const duration = 100 + scale * 400;
+
+                player.scene?.camera.shake(power, power, duration);
+            }
+
             const target = precollision.target.owner;
             const other = precollision.other.owner;
 
@@ -125,6 +140,11 @@ export class SolidBodyComponent extends Component {
             const impulse = collisionNormal.scale(impulseScalar);
 
             thisBody.nextVel = thisBody.vel.sub(impulse.scale(1 / thisBody.mass));
+        });
+
+        owner.on("kill", () => {
+            const pos = owner.get(TransformComponent).pos;
+            owner.scene?.add(new Explosion(pos));
         });
     }
 }

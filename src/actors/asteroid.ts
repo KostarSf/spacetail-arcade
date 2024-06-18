@@ -4,6 +4,7 @@ import { vec, vecToArray } from "~/utils/math";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Resources } from "../resources";
+import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 
 export interface AsteroidOptions {
     uuid?: string;
@@ -43,8 +44,8 @@ export class Asteroid extends Actor {
     }
 
     onInitialize(_engine: Engine): void {
-        const sprite = Resources.Asteroid.toSprite();
-        sprite.tint = Color.Gray;
+        const sprite = ShadowedSprite.from(Resources.Asteroid);
+        sprite.tint = Color.DarkGray;
 
         this.graphics.add(sprite);
 

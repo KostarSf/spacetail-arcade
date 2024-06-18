@@ -1,6 +1,6 @@
 import { Engine, Keys, PointerButton } from "excalibur";
 import { netClient } from "../network/NetClient";
-import { easeOut, lerp, round, vecToArray } from "../utils/math";
+import { easeOut, lerp, linInt, round, vecToArray } from "../utils/math";
 import { Bullet } from "./bullet";
 import { Ship, ShipOptions } from "./ship";
 
@@ -38,6 +38,8 @@ export class Player extends Ship {
         if (!bullet) {
             return;
         }
+
+        this.scene?.camera.shake(3, 3, 100);
 
         netClient.send({
             type: "player",
@@ -100,6 +102,11 @@ export class Player extends Ship {
         const delta = elapsedMs / 1000;
         this.updateInputControlls(engine, delta);
         this.updateCameraZoom(engine, delta);
+
+        if (this.ship.accelerated) {
+            const power = 1 + linInt(this.vel.squareDistance(), 0, 1_000_000, 0, 1) * 2;
+            this.scene?.camera.shake(power, power, 100);
+        }
     }
 
     private oldSendedRotation: number = 0;
