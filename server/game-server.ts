@@ -17,6 +17,7 @@ export function runGameServer(port?: number) {
         isHost: boolean;
         data: PlayerData | null;
         lastUpdateTime: number;
+        latency: number;
     }[] = [];
 
     let entities: Map<string, EntityEventData> = new Map();
@@ -27,6 +28,7 @@ export function runGameServer(port?: number) {
             data: null,
             isHost: false,
             lastUpdateTime: Date.now(),
+            latency: 0,
         };
         players.push(player);
 
@@ -153,6 +155,19 @@ export function runGameServer(port?: number) {
                 if (data.action === "remove") {
                     entities.delete(data.target);
                 }
+            }
+
+            if (data.type === "ping") {
+                const now = Date.now();
+                player.latency = now - data.time;
+                ws.send(
+                    JSON.stringify({
+                        type: "server",
+                        action: "pong",
+                        target: player.data?.uuid ?? "none",
+                        time: now,
+                    } satisfies NetEvent)
+                );
             }
         });
 

@@ -1,6 +1,13 @@
 import { NetEvent } from "./events";
 
 class NetClient {
+    private _latency: number = 0;
+    private _lastPingTime: number = 0;
+
+    public get latency() {
+        return this._latency;
+    }
+
     private _isHost: boolean = false;
 
     public get isHost() {
@@ -21,6 +28,11 @@ class NetClient {
 
     constructor() {
         this.socket = this.openSocket();
+
+        setInterval(() => {
+            this._lastPingTime = Date.now();
+            this.send({ type: "ping", time: this._lastPingTime });
+        }, 500);
     }
 
     private openSocket() {
@@ -45,6 +57,7 @@ class NetClient {
 
         this.socket.onerror = (ev) => {
             console.error(ev);
+            document.location.reload();
         };
 
         this.socket.onmessage = async (message: MessageEvent<Blob | string>) => {
@@ -71,12 +84,16 @@ class NetClient {
     }
 
     private processIfServiceEvent(event: NetEvent) {
-        if (event.type !== "server" || event.action !== "set-host") {
-            return false;
+        if (event.type === "server" && event.action === "set-host") {
+            this._isHost = event.data.isHost;
+            return true;
         }
 
-        this._isHost = event.data.isHost;
-        return true;
+        if (event.type === "server" && event.action === "pong") {
+            this._latency = Math.round((Date.now() - this._lastPingTime) / 2);
+        }
+
+        return false;
     }
 
     onMessage(callback: (event: NetEvent) => void) {

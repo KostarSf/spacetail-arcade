@@ -5,12 +5,14 @@ import { Bullet } from "./bullet";
 import { Ship, ShipOptions } from "./ship";
 
 export class Player extends Ship {
+    public static readonly Tag: string = "client-player";
+
     private isMouseControl: boolean = true;
 
     constructor(options: ShipOptions) {
         super({ ...options, name: options.name ?? "Player" });
         this.addTag("player");
-        this.addTag("client-player");
+        this.addTag(Player.Tag);
     }
 
     override set accelerated(value: boolean) {

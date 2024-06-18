@@ -99,6 +99,14 @@ export type NetServerEvent = {
           action: "entities-list";
           data: EntityEventData[];
       }
+    | {
+          action: "pong";
+      }
 );
 
-export type NetEvent = NetPlayerEvent | NetEntityEvent | NetServerEvent;
+export type NetClientEvent = {
+    type: "ping";
+    time: number;
+};
+
+export type NetEvent = NetPlayerEvent | NetEntityEvent | NetServerEvent | NetClientEvent;

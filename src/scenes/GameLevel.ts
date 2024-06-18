@@ -13,13 +13,13 @@ import {
     TransformComponent,
     vec,
 } from "excalibur";
+import { ShipSystem } from "~/ecs/ship/ShipSystem";
 import { Asteroid, AsteroidOptions } from "../actors/asteroid";
 import { Bullet } from "../actors/bullet";
 import { Player } from "../actors/player";
 import { Ship } from "../actors/ship";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { PhysicsSystem } from "../ecs/physics.ecs";
-import { ShipSystem } from "~/ecs/ship/ShipSystem";
 import { Decal } from "../entities/decal";
 import { netClient } from "../network/NetClient";
 import { Resources } from "../resources";
@@ -30,6 +30,8 @@ export class GameLevel extends Scene {
 
     private offlineLabel: Actor;
     private isHostLabel: Actor;
+    private latencyLabel: Actor;
+    private latencyLabelText: Text;
 
     constructor() {
         super();
@@ -65,6 +67,21 @@ export class GameLevel extends Scene {
                 }),
             })
         );
+
+        this.latencyLabel = new ScreenElement({
+            pos: vec(70, 10),
+        });
+
+        this.latencyLabelText = new Text({
+            text: "none",
+            font: new Font({
+                family: "consolas",
+                size: 24,
+                unit: FontUnit.Px,
+                color: Color.Gray,
+            }),
+        });
+        this.latencyLabel.graphics.use(this.latencyLabelText);
     }
 
     onActivate(_context: SceneActivationContext<unknown>): void {
@@ -150,12 +167,15 @@ export class GameLevel extends Scene {
                 }
 
                 if (event.action === "fire") {
+                    const delta = (Date.now() - event.time) / 1000;
+                    const vel = vec(...event.data.objectVel);
+                    const pos = vec(...event.data.objectPos).add(vel.scale(delta));
                     this.add(
                         new Bullet({
                             uuid: event.data.objectUuid,
                             actor: otherPlayer,
-                            pos: vec(...event.data.objectPos),
-                            vel: vec(...event.data.objectVel),
+                            vel: vel,
+                            pos: pos,
                         })
                     );
                 }
@@ -217,6 +237,7 @@ export class GameLevel extends Scene {
 
         this.add(this.offlineLabel);
         this.add(this.isHostLabel);
+        this.add(this.latencyLabel);
 
         if (netClient.isHost) {
             this.prepareWorld();
@@ -254,5 +275,6 @@ export class GameLevel extends Scene {
     onPostUpdate(_engine: Engine<any>, _delta: number): void {
         this.offlineLabel.graphics.visible = netClient.offline;
         this.isHostLabel.graphics.visible = netClient.isHost;
+        this.latencyLabelText.text = netClient.latency + "ms";
     }
 }

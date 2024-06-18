@@ -3,6 +3,7 @@ import { UuidComponent } from "~/ecs/UuidComponent";
 import { netClient } from "~/network/NetClient";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Animations } from "../resources";
+import { Player } from "./player";
 
 export interface BulletOptions {
     uuid?: string;
@@ -46,10 +47,19 @@ export class Bullet extends Actor {
 
             this.kill();
             evt.other.kill();
+
+            if (this.actor.hasTag(Player.Tag)) {
+                netClient.send({
+                    type: "entity",
+                    action: "remove",
+                    target: evt.other.get(UuidComponent).uuid,
+                    time: Date.now(),
+                });
+            }
         });
 
         this.on("kill", () => {
-            if (!netClient.isHost) {
+            if (!netClient.isHost && !this.actor.hasTag(Player.Tag)) {
                 return;
             }
 

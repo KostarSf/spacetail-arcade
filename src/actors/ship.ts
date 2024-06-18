@@ -1,5 +1,6 @@
 import { Actor, Engine, PolygonCollider, Vector, vec } from "excalibur";
 import { ShipComponent } from "~/ecs/ship";
+import { netClient } from "~/network/NetClient";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Resources } from "../resources";
@@ -37,6 +38,19 @@ export class Ship extends Actor {
     onInitialize(_engine: Engine): void {
         const sprite = Resources.Player.toSprite();
         this.graphics.add(sprite);
+
+        this.on("kill", () => {
+            if (!netClient.isHost) {
+                return;
+            }
+
+            netClient.send({
+                type: "entity",
+                action: "remove",
+                target: this.uuid,
+                time: Date.now(),
+            });
+        });
     }
 
     public fire() {
