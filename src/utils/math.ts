@@ -61,3 +61,12 @@ export function linInt(
 
     return interpolatedValue;
 }
+
+export function vectorInBounds(vector: Vector, topLeft: Vector, bottomRight: Vector) {
+    return (
+        vector.x >= topLeft.x &&
+        vector.x <= bottomRight.x &&
+        vector.y >= topLeft.y &&
+        vector.y <= bottomRight.y
+    );
+}

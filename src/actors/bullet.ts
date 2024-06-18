@@ -1,6 +1,7 @@
 import { Actor, CollisionType, Entity, Vector } from "excalibur";
 import { UuidComponent } from "~/ecs/UuidComponent";
 import { netClient } from "~/network/NetClient";
+import { GameLevel } from "~/scenes/GameLevel";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Animations } from "../resources";
 import { Player } from "./player";
@@ -71,6 +72,12 @@ export class Bullet extends Actor {
                 target: this.uuid,
                 time: netClient.getTime(),
             });
+        });
+
+        this.on("postupdate", () => {
+            if (!GameLevel.inBounds(this.pos)) {
+                this.kill();
+            }
         });
 
         this.actions.delay(5000).die();

@@ -1,17 +1,23 @@
 import {
     Actor,
+    CollisionType,
     Color,
+    CompositeCollider,
     Engine,
     Font,
     FontUnit,
+    GraphicsGroup,
     ImageFiltering,
+    Line,
     MotionComponent,
     Query,
     Scene,
     SceneActivationContext,
     ScreenElement,
+    Shape,
     Text,
     TransformComponent,
+    Vector,
     vec,
 } from "excalibur";
 import { ShipSystem } from "~/ecs/ship/ShipSystem";
@@ -27,6 +33,13 @@ import { Resources } from "../resources";
 import { rand } from "../utils/math";
 
 export class GameLevel extends Scene {
+    public static readonly worldSize: number = 5000;
+
+    public static inBounds(vector: Vector, offset = 0) {
+        const size = GameLevel.worldSize + offset;
+        return vector.x >= -size && vector.x <= size && vector.y >= -size && vector.y <= size;
+    }
+
     private uuidEntitiesQuery!: Query<typeof UuidComponent>;
 
     private offlineLabel: Actor;
@@ -227,15 +240,63 @@ export class GameLevel extends Scene {
     }
 
     onInitialize(_engine: Engine<any>): void {
+        const worldSize = GameLevel.worldSize;
+
         const space = new Decal({
             image: Resources.Space,
-            pos: vec(100, 100),
+            pos: vec(0, 0),
             parallax: 0.2,
             zoomResist: 1.3,
         });
         this.add(space);
 
-        const randPos = () => 0 + Math.random() * 200;
+        const bordersEntity = new Actor({
+            collisionType: CollisionType.Fixed,
+            collider: new CompositeCollider([
+                Shape.Edge(vec(-worldSize, worldSize), vec(worldSize, worldSize)),
+                Shape.Edge(vec(-worldSize, -worldSize), vec(worldSize, -worldSize)),
+                Shape.Edge(vec(-worldSize, -worldSize), vec(-worldSize, worldSize)),
+                Shape.Edge(vec(worldSize, -worldSize), vec(worldSize, worldSize)),
+            ]),
+        });
+        bordersEntity.addTag("border");
+        const borders = [
+            new Line({
+                start: vec(-worldSize, worldSize),
+                end: vec(worldSize, worldSize),
+                color: Color.Red,
+                thickness: 3,
+            }),
+            new Line({
+                start: vec(-worldSize, -worldSize),
+                end: vec(worldSize, -worldSize),
+                color: Color.Red,
+                thickness: 3,
+            }),
+            new Line({
+                start: vec(-worldSize, -worldSize),
+                end: vec(-worldSize, worldSize),
+                color: Color.Red,
+                thickness: 3,
+            }),
+            new Line({
+                start: vec(worldSize, -worldSize),
+                end: vec(worldSize, worldSize),
+                color: Color.Red,
+                thickness: 3,
+            }),
+        ];
+        const bordersGroup = new GraphicsGroup({
+            members: borders.map((border) => ({
+                graphic: border,
+                offset: Vector.One.scale(worldSize),
+            })),
+        });
+        bordersEntity.graphics.add(bordersGroup);
+
+        this.add(bordersEntity);
+
+        const randPos = () => -100 + Math.random() * 200;
         const player = new Player({ pos: vec(randPos(), randPos()) });
         this.add(player);
 
@@ -244,7 +305,7 @@ export class GameLevel extends Scene {
         this.add(this.latencyLabel);
 
         if (netClient.isHost) {
-            this.prepareWorld();
+            this.prepareHostWorld();
         }
 
         netClient.send({
@@ -256,14 +317,32 @@ export class GameLevel extends Scene {
         });
     }
 
-    private prepareWorld() {
+    private prepareHostWorld() {
+        const asteroidsCount = 200;
+
         const asteroidSpawns = [
-            vec(10, 30),
-            vec(140, -40),
-            vec(270, 190),
-            vec(100, 300),
-            vec(170, 320),
+            vec(-110, -90),
+            vec(20, -160),
+            vec(150, 70),
+            vec(-20, 180),
+            vec(50, 200),
         ];
+
+        for (let i = 0; i < asteroidsCount; i++) {
+            asteroidSpawns.push(
+                rand.pickOne([
+                    vec(
+                        rand.integer(-GameLevel.worldSize, GameLevel.worldSize),
+                        rand.integer(100, GameLevel.worldSize) * rand.pickOne([1, -1])
+                    ),
+                    vec(
+                        rand.integer(100, GameLevel.worldSize) * rand.pickOne([1, -1]),
+                        rand.integer(-GameLevel.worldSize, GameLevel.worldSize)
+                    ),
+                ])
+            );
+        }
+
         const asteroidOptions = asteroidSpawns.map(
             (pos): AsteroidOptions => ({
                 pos,
@@ -280,6 +359,11 @@ export class GameLevel extends Scene {
         this.offlineLabel.graphics.visible = netClient.offline;
         this.isHostLabel.graphics.visible = netClient.isHost;
         this.latencyLabelText.text =
-            "ping: " + netClient.latency + "ms, offset: " + netClient.timeOffset;
+            "ping: " +
+            netClient.latency +
+            "ms, offset: " +
+            netClient.timeOffset +
+            ", entities: " +
+            this.world.entities.length;
     }
 }
