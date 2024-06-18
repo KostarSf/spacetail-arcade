@@ -133,7 +133,7 @@ export class PhysicsSystem extends System {
                 type: isPlayer ? "player" : "entity",
                 action: "update",
                 target: uuid.uuid,
-                time: Date.now(),
+                time: netClient.getTime(),
                 data: {
                     pos: vecToArray(transform.pos, 2),
                     vel: vecToArray(motion.vel, 2),

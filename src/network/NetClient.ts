@@ -3,9 +3,18 @@ import { NetEvent } from "./events";
 class NetClient {
     private _latency: number = 0;
     private _lastPingTime: number = 0;
+    private _timeOffset: number = 0;
 
     public get latency() {
         return this._latency;
+    }
+
+    public get timeOffset() {
+        return this._timeOffset;
+    }
+
+    public getTime() {
+        return Date.now() + this.timeOffset;
     }
 
     private _isHost: boolean = false;
@@ -31,7 +40,7 @@ class NetClient {
 
         setInterval(() => {
             this._lastPingTime = Date.now();
-            this.send({ type: "ping", time: this._lastPingTime });
+            this.send({ type: "ping", time: this._lastPingTime + this._timeOffset });
         }, 500);
     }
 
@@ -90,7 +99,10 @@ class NetClient {
         }
 
         if (event.type === "server" && event.action === "pong") {
-            this._latency = Math.round((Date.now() - this._lastPingTime) / 2);
+            const now = Date.now();
+            this._latency = Math.round((now - this._lastPingTime) / 2);
+            const clientTime = Math.round((this._lastPingTime + now) / 2);
+            this._timeOffset = event.time - clientTime;
         }
 
         return false;

@@ -13,6 +13,8 @@ export interface BulletOptions {
 }
 
 export class Bullet extends Actor {
+    public static readonly energyCost: number = 30;
+
     public readonly actor: Entity;
 
     get uuid() {
@@ -53,7 +55,7 @@ export class Bullet extends Actor {
                     type: "entity",
                     action: "remove",
                     target: evt.other.get(UuidComponent).uuid,
-                    time: Date.now(),
+                    time: netClient.getTime(),
                 });
             }
         });
@@ -67,7 +69,7 @@ export class Bullet extends Actor {
                 type: "entity",
                 action: "remove",
                 target: this.uuid,
-                time: Date.now(),
+                time: netClient.getTime(),
             });
         });
 

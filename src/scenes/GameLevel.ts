@@ -4,6 +4,7 @@ import {
     Engine,
     Font,
     FontUnit,
+    ImageFiltering,
     MotionComponent,
     Query,
     Scene,
@@ -45,9 +46,10 @@ export class GameLevel extends Scene {
                 text: "reconnecting...",
                 font: new Font({
                     family: "consolas",
-                    size: 24,
+                    size: 12,
                     unit: FontUnit.Px,
                     color: Color.Red,
+                    filtering: ImageFiltering.Pixel,
                 }),
             })
         );
@@ -61,9 +63,10 @@ export class GameLevel extends Scene {
                 text: "host",
                 font: new Font({
                     family: "consolas",
-                    size: 24,
+                    size: 12,
                     unit: FontUnit.Px,
                     color: Color.Yellow,
+                    filtering: ImageFiltering.Pixel,
                 }),
             })
         );
@@ -76,9 +79,10 @@ export class GameLevel extends Scene {
             text: "none",
             font: new Font({
                 family: "consolas",
-                size: 24,
+                size: 12,
                 unit: FontUnit.Px,
                 color: Color.Gray,
+                filtering: ImageFiltering.Pixel,
             }),
         });
         this.latencyLabel.graphics.use(this.latencyLabelText);
@@ -167,7 +171,7 @@ export class GameLevel extends Scene {
                 }
 
                 if (event.action === "fire") {
-                    const delta = (Date.now() - event.time) / 1000;
+                    const delta = (netClient.getTime() - event.time) / 1000;
                     const vel = vec(...event.data.objectVel);
                     const pos = vec(...event.data.objectPos).add(vel.scale(delta));
                     this.add(
@@ -247,7 +251,7 @@ export class GameLevel extends Scene {
             type: "player",
             action: "spawn",
             target: player.uuid,
-            time: Date.now(),
+            time: netClient.getTime(),
             data: player.serialize(),
         });
     }
@@ -275,6 +279,7 @@ export class GameLevel extends Scene {
     onPostUpdate(_engine: Engine<any>, _delta: number): void {
         this.offlineLabel.graphics.visible = netClient.offline;
         this.isHostLabel.graphics.visible = netClient.isHost;
-        this.latencyLabelText.text = netClient.latency + "ms";
+        this.latencyLabelText.text =
+            "ping: " + netClient.latency + "ms, offset: " + netClient.timeOffset;
     }
 }

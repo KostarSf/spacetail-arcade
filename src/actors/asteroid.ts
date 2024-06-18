@@ -53,7 +53,7 @@ export class Asteroid extends Actor {
                 type: "entity",
                 action: "remove",
                 target: this.uuid,
-                time: Date.now(),
+                time: netClient.getTime(),
             });
         });
 
@@ -62,10 +62,10 @@ export class Asteroid extends Actor {
                 type: "entity",
                 action: "spawn",
                 target: this.uuid,
-                time: Date.now(),
+                time: netClient.getTime(),
                 data: {
                     class: "Asteroid",
-                    time: Date.now(),
+                    time: netClient.getTime(),
                     args: this.serialize(),
                 },
             });

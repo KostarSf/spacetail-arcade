@@ -1,10 +1,11 @@
-import { Actor, Engine, PolygonCollider, Vector, vec } from "excalibur";
+import { Actor, Color, Engine, GraphicsGroup, Line, PolygonCollider, Vector, vec } from "excalibur";
 import { ShipComponent } from "~/ecs/ship";
 import { netClient } from "~/network/NetClient";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Resources } from "../resources";
 import { Bullet } from "./bullet";
+import { linInt } from "~/utils/math";
 
 export interface ShipOptions {
     uuid?: string;
@@ -15,6 +16,8 @@ export interface ShipOptions {
 }
 
 export class Ship extends Actor {
+    private energyLine: Line;
+
     get uuid() {
         return this.get(UuidComponent).uuid;
     }
@@ -33,11 +36,25 @@ export class Ship extends Actor {
         this.addComponent(new UuidComponent(options.uuid));
         this.addComponent(new ShipComponent());
         this.addComponent(new SolidBodyComponent({ mass: 10 }));
+
+        this.energyLine = new Line({
+            start: vec(24, 0),
+            end: vec(24, 32),
+            color: Color.Cyan,
+            thickness: 3,
+        });
     }
 
     onInitialize(_engine: Engine): void {
         const sprite = Resources.Player.toSprite();
-        this.graphics.add(sprite);
+        this.graphics.add(
+            new GraphicsGroup({
+                members: [
+                    { graphic: sprite, offset: Vector.Zero },
+                    { graphic: this.energyLine, offset: vec(16, 0), useBounds: false },
+                ],
+            })
+        );
 
         this.on("kill", () => {
             if (!netClient.isHost) {
@@ -48,13 +65,27 @@ export class Ship extends Actor {
                 type: "entity",
                 action: "remove",
                 target: this.uuid,
-                time: Date.now(),
+                time: netClient.getTime(),
             });
         });
     }
 
+    onPostUpdate(engine: Engine<any>, delta: number): void {
+        super.onPostUpdate(engine, delta);
+
+        const lowEnergy = this.ship.energy < Bullet.energyCost;
+        this.energyLine.color = lowEnergy ? Color.Red : Color.Cyan;
+
+        this.energyLine.rotation = -this.rotation - (Math.PI * 0.5);
+        this.energyLine.end.y = 32 * linInt(this.ship.energy, 0, this.ship.energyLimit);
+    }
+
     public fire() {
         if (!this.scene) {
+            return;
+        }
+
+        if (!this.ship.consumeEnergy(Bullet.energyCost)) {
             return;
         }
 

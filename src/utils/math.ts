@@ -1,4 +1,4 @@
-import { Random, Vector } from "excalibur";
+import { Random, Vector, clamp } from "excalibur";
 
 export const rand = new Random(256);
 
@@ -40,4 +40,24 @@ export function vec(param1: number | Vector | [number, number], param2?: number)
 
 export function round(value: number, fractionDigits: number) {
     return Number(value.toFixed(fractionDigits));
+}
+
+export function linInt(
+    currentValue: number,
+    lowerBorder: number,
+    higherBorder: number,
+    interpolatedLower = 0,
+    interpolatedHigher = 1
+) {
+    const clampedValue = clamp(currentValue, lowerBorder, higherBorder);
+
+    const interpolationFactor = (clampedValue - lowerBorder) / (higherBorder - lowerBorder);
+    const interpolatedValue =
+        interpolatedLower + interpolationFactor * (interpolatedHigher - interpolatedLower);
+
+    if (isNaN(interpolatedValue)) {
+        return higherBorder;
+    }
+
+    return interpolatedValue;
 }

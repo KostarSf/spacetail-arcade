@@ -21,7 +21,7 @@ export class Player extends Ship {
                 type: "player",
                 target: this.uuid,
                 action: "accelerated",
-                time: Date.now(),
+                time: netClient.getTime(),
                 data: {
                     value: value,
                     ...this.serialize(),
@@ -43,7 +43,7 @@ export class Player extends Ship {
             type: "player",
             target: this.uuid,
             action: "fire",
-            time: Date.now(),
+            time: netClient.getTime(),
             data: {
                 object: "Bullet",
                 objectUuid: bullet.uuid,
@@ -95,6 +95,8 @@ export class Player extends Ship {
     }
 
     onPostUpdate(engine: Engine, elapsedMs: number): void {
+        super.onPostUpdate(engine, elapsedMs);
+
         const delta = elapsedMs / 1000;
         this.updateInputControlls(engine, delta);
         this.updateCameraZoom(engine, delta);
@@ -130,7 +132,7 @@ export class Player extends Ship {
                 type: "player",
                 target: this.uuid,
                 action: "rotated",
-                time: Date.now(),
+                time: netClient.getTime(),
                 data: this.serialize(),
             });
         }
