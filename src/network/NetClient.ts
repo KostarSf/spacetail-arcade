@@ -24,7 +24,7 @@ class NetClient {
     }
 
     private openSocket() {
-        this.socket = new WebSocket("ws://localhost:8080");
+        this.socket = new WebSocket(`ws://${document.location.hostname}:8080`);
 
         this.socket.onopen = () => {
             this._offline = false;
