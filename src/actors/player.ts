@@ -1,4 +1,4 @@
-import { Engine, Keys, PointerButton } from "excalibur";
+import { Color, Engine, Keys, PointerButton } from "excalibur";
 import { netClient } from "../network/NetClient";
 import { easeOut, lerp, linInt, round, vecToArray } from "../utils/math";
 import { Bullet } from "./bullet";
@@ -10,7 +10,7 @@ export class Player extends Ship {
     private isMouseControl: boolean = true;
 
     constructor(options: ShipOptions) {
-        super({ ...options, name: options.name ?? "Player" });
+        super({ ...options, name: options.name ?? "Player", healthColor: Color.Green });
         this.addTag("player");
         this.addTag(Player.Tag);
     }
@@ -51,6 +51,7 @@ export class Player extends Ship {
                 objectUuid: bullet.uuid,
                 objectPos: [bullet.pos.x, bullet.pos.y],
                 objectVel: [bullet.vel.x, bullet.vel.y],
+                objectDamage: bullet.damage,
                 ...this.serialize(),
             },
         });
@@ -60,6 +61,11 @@ export class Player extends Ship {
 
     onInitialize(engine: Engine): void {
         super.onInitialize(engine);
+
+        this.health.events.on("damage", (evt) => {
+            const scale = Math.max(10, evt.amount / 3);
+            engine.currentScene.camera.shake(scale, scale, 200);
+        });
 
         engine.input.pointers.primary.on("move", () => {
             this.isMouseControl = true;

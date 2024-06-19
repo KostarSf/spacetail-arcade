@@ -1,9 +1,9 @@
 import compression from "compression";
 import express from "express";
+import morgan from "morgan";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runGameServer } from "./game-server";
-import morgan from "morgan";
 
 const app = express();
 const PORT = process.env.PORT || 3000;

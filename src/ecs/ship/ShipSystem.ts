@@ -42,7 +42,7 @@ export class ShipSystem extends System {
             }
 
             if (ship.accelerated) {
-                motion.vel.addEqual(Vector.fromAngle(transform.rotation).scale(300 * delta));
+                motion.vel.addEqual(Vector.fromAngle(transform.rotation).scale(100 * delta));
             }
 
             motion.vel.scaleEqual(movementDecay);

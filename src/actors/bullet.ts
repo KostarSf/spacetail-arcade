@@ -1,8 +1,8 @@
 import { Actor, CollisionType, Entity, Vector } from "excalibur";
 import { UuidComponent } from "~/ecs/UuidComponent";
+import { HealthComponent } from "~/ecs/health.ecs";
 import { netClient } from "~/network/NetClient";
 import { GameLevel } from "~/scenes/GameLevel";
-import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Animations } from "../resources";
 import { Player } from "./player";
 
@@ -11,12 +11,14 @@ export interface BulletOptions {
     actor: Entity;
     pos: Vector;
     vel: Vector;
+    damage: number;
 }
 
 export class Bullet extends Actor {
     public static readonly energyCost: number = 30;
 
     public readonly actor: Entity;
+    public readonly damage: number;
 
     get uuid() {
         return this.get(UuidComponent).uuid;
@@ -34,6 +36,7 @@ export class Bullet extends Actor {
         this.addComponent(new UuidComponent(options.uuid));
 
         this.actor = options.actor;
+        this.damage = options.damage;
     }
 
     onInitialize(): void {
@@ -43,22 +46,13 @@ export class Bullet extends Actor {
         this.graphics.use(animation);
 
         this.on("collisionstart", (evt) => {
-            const canHit = evt.other.has(SolidBodyComponent) || evt.other instanceof Bullet;
+            const canHit = evt.other.has(HealthComponent) || evt.other instanceof Bullet;
             if (evt.other === this.actor || !canHit) {
                 return;
             }
 
             this.kill();
-            evt.other.kill();
-
-            if (this.actor.hasTag(Player.Tag)) {
-                netClient.send({
-                    type: "entity",
-                    action: "remove",
-                    target: evt.other.get(UuidComponent).uuid,
-                    time: netClient.getTime(),
-                });
-            }
+            evt.other.get(HealthComponent).changeHealth(-this.damage, this);
         });
 
         this.on("kill", () => {

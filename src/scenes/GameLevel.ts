@@ -32,10 +32,11 @@ import { Player } from "../actors/player";
 import { Ship } from "../actors/ship";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { PhysicsSystem } from "../ecs/physics.ecs";
-import { Decal } from "../entities/decal";
+import { Decal } from "../entities/Decal";
 import { netClient } from "../network/NetClient";
 import { Resources } from "../resources";
 import { linInt, rand } from "../utils/math";
+import { HealthSystem } from "~/ecs/health.ecs";
 
 export class GameLevel extends Scene {
     public static readonly worldSize: number = 5000;
@@ -135,6 +136,7 @@ export class GameLevel extends Scene {
     onActivate(_context: SceneActivationContext<unknown>): void {
         this.world.add(PhysicsSystem);
         this.world.add(ShipSystem);
+        this.world.add(HealthSystem);
         this.uuidEntitiesQuery = this.world.query([UuidComponent]);
         this.shipsQuery = this.world.query([ShipComponent]);
         this.asteroidsQuery = this.world.queryTags([Asteroid.Tag]);
@@ -226,6 +228,7 @@ export class GameLevel extends Scene {
                             actor: otherPlayer,
                             vel: vel,
                             pos: pos,
+                            damage: event.data.objectDamage,
                         })
                     );
 

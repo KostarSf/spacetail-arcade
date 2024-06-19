@@ -56,6 +56,7 @@ export type NetPlayerEvent = {
               objectUuid: string;
               objectPos: [number, number];
               objectVel: [number, number];
+              objectDamage: number;
               pos: [number, number];
               vel: [number, number];
               rotation: number;

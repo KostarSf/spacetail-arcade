@@ -1,22 +1,23 @@
 import {
     Actor,
+    Animation,
     Color,
     Engine,
-    Animation,
     GraphicsGroup,
-    Line,
     PolygonCollider,
     Vector,
     vec,
 } from "excalibur";
+import { HealthComponent } from "~/ecs/health.ecs";
 import { ShipComponent } from "~/ecs/ship";
+import { Explosion } from "~/entities/Explosion";
+import { ResourceLine } from "~/graphics/ResourceLine";
+import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { netClient } from "~/network/NetClient";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Animations, Resources } from "../resources";
 import { Bullet } from "./bullet";
-import { linInt } from "~/utils/math";
-import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 
 export interface ShipOptions {
     uuid?: string;
@@ -24,15 +25,21 @@ export interface ShipOptions {
     vel?: Vector | [number, number];
     rotation?: number;
     name?: string;
+    healthColor?: Color;
 }
 
 export class Ship extends Actor {
-    private energyLine: Line;
     private jetGraphics!: Animation;
 
     get uuid() {
         return this.get(UuidComponent).uuid;
     }
+
+    get health() {
+        return this.get(HealthComponent);
+    }
+
+    private healthColor: Color;
 
     constructor(options: ShipOptions = {}) {
         super({
@@ -48,13 +55,9 @@ export class Ship extends Actor {
         this.addComponent(new UuidComponent(options.uuid));
         this.addComponent(new ShipComponent());
         this.addComponent(new SolidBodyComponent({ mass: 10 }));
+        this.addComponent(new HealthComponent({ health: 100, labelsAnchor: vec(0, -24) }));
 
-        this.energyLine = new Line({
-            start: vec(24, 0),
-            end: vec(24, 32),
-            color: Color.Cyan,
-            thickness: 3,
-        });
+        this.healthColor = options.healthColor ?? Color.Red;
     }
 
     onInitialize(_engine: Engine): void {
@@ -65,7 +68,36 @@ export class Ship extends Actor {
                 members: [
                     { graphic: ShadowedSprite.from(Resources.Player), offset: Vector.Zero },
                     { graphic: this.jetGraphics, offset: Vector.Zero },
-                    { graphic: this.energyLine, offset: vec(16, 0), useBounds: false },
+                    {
+                        graphic: new ResourceLine({
+                            pos: vec(26, 0),
+                            lineWidth: 32,
+                            color: () => {
+                                const lowEnergy = this.ship.energy < Bullet.energyCost;
+                                return lowEnergy ? Color.Red : Color.Cyan;
+                            },
+                            minValue: 0,
+                            maxValue: this.ship.energyLimit,
+                            valueFn: () => this.ship.energy,
+                            rotationFn: () => -this.rotation - Math.PI * 0.5,
+                            hideOnMaxValue: true,
+                        }),
+                        offset: vec(16, 0),
+                        useBounds: false,
+                    },
+                    {
+                        graphic: new ResourceLine({
+                            pos: vec(22, 0),
+                            lineWidth: 32,
+                            color: this.healthColor,
+                            minValue: 0,
+                            maxValue: this.health.maxHealth,
+                            valueFn: () => this.health.health,
+                            rotationFn: () => -this.rotation - Math.PI * 0.5,
+                        }),
+                        offset: vec(16, 0),
+                        useBounds: false,
+                    },
                 ],
             })
         );
@@ -82,16 +114,18 @@ export class Ship extends Actor {
                 time: netClient.getTime(),
             });
         });
+
+        this.health.events.on("damage", () => {
+            this.scene?.add(new Explosion(this.pos));
+        });
+
+        this.health.events.on("death", () => {
+            this.kill();
+        });
     }
 
     onPostUpdate(engine: Engine<any>, delta: number): void {
         super.onPostUpdate(engine, delta);
-
-        const lowEnergy = this.ship.energy < Bullet.energyCost;
-        this.energyLine.color = lowEnergy ? Color.Red : Color.Cyan;
-
-        this.energyLine.rotation = -this.rotation - Math.PI * 0.5;
-        this.energyLine.end.y = 32 * linInt(this.ship.energy, 0, this.ship.energyLimit);
 
         this.jetGraphics.opacity = this.ship.accelerated ? 1 : 0;
     }
@@ -110,7 +144,7 @@ export class Ship extends Actor {
         const pos = this.pos.add(direction.scale(15));
         const vel = this.vel.add(direction.scale(350));
 
-        const bullet = new Bullet({ actor: this, pos, vel });
+        const bullet = new Bullet({ actor: this, pos, vel, damage: 25 });
         this.scene.add(bullet);
 
         this.vel.subEqual(direction.scale(3));

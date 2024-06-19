@@ -17,11 +17,12 @@ import {
     vec,
 } from "excalibur";
 import { Player } from "~/actors/player";
+import { Explosion } from "~/entities/Explosion";
 import { GameLevel } from "~/scenes/GameLevel";
 import { netClient } from "../network/NetClient";
 import { linInt, round, vecToArray } from "../utils/math";
 import { UuidComponent } from "./UuidComponent";
-import { Explosion } from "~/entities/explosion";
+import { HealthComponent } from "./health.ecs";
 
 export interface SolidBodyOptions {
     mass: number;
@@ -145,6 +146,22 @@ export class SolidBodyComponent extends Component {
         owner.on("kill", () => {
             const pos = owner.get(TransformComponent).pos;
             owner.scene?.add(new Explosion(pos));
+        });
+
+        owner.on("initialize", () => {
+            const motion = owner.get(MotionComponent)!;
+            const health = owner.get(HealthComponent);
+            const body = owner.get(BodyComponent);
+
+            health?.events.on("damage", (evt) => {
+                if (!evt.damager) {
+                    return;
+                }
+
+                motion.vel.addEqual(
+                    evt.damager.vel.normalize().scale((evt.amount * 5) / body.mass)
+                );
+            });
         });
     }
 }

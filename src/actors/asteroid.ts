@@ -5,6 +5,7 @@ import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Resources } from "../resources";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
+import { HealthComponent } from "~/ecs/health.ecs";
 
 export interface AsteroidOptions {
     uuid?: string;
@@ -28,6 +29,10 @@ export class Asteroid extends Actor {
         return this.get(SolidBodyComponent);
     }
 
+    get health() {
+        return this.get(HealthComponent);
+    }
+
     constructor(options: AsteroidOptions) {
         super({
             pos: options.pos ? vec(options.pos) : undefined,
@@ -39,6 +44,7 @@ export class Asteroid extends Actor {
 
         this.addComponent(new UuidComponent(options.uuid));
         this.addComponent(new SolidBodyComponent({ mass: options.mass }));
+        this.addComponent(new HealthComponent({ health: 50, labelsAnchor: vec(0, -12) }));
 
         this.addTag(Asteroid.Tag);
     }
@@ -75,6 +81,10 @@ export class Asteroid extends Actor {
                 },
             });
         }
+
+        this.health.events.on("death", () => {
+            this.kill();
+        });
     }
 
     public serialize() {
