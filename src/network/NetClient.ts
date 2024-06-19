@@ -5,6 +5,13 @@ class NetClient {
     private _lastPingTime: number = 0;
     private _timeOffset: number = 0;
 
+    private _simulatedLatency: number = 0;
+    private _clockDesync: number = 0;
+
+    private get _now() {
+        return Date.now() + this._clockDesync;
+    }
+
     public get latency() {
         return this._latency;
     }
@@ -14,7 +21,7 @@ class NetClient {
     }
 
     public getTime() {
-        return Date.now() + this.timeOffset;
+        return this._now + this.timeOffset;
     }
 
     private _isHost: boolean = false;
@@ -39,7 +46,7 @@ class NetClient {
         this.socket = this.openSocket();
 
         setInterval(() => {
-            this._lastPingTime = Date.now();
+            this._lastPingTime = this._now;
             this.send({ type: "ping", time: this._lastPingTime + this._timeOffset });
         }, 500);
     }
@@ -99,7 +106,7 @@ class NetClient {
         }
 
         if (event.type === "server" && event.action === "pong") {
-            const now = Date.now();
+            const now = this._now;
             this._latency = Math.round((now - this._lastPingTime) / 2);
             const clientTime = Math.round((this._lastPingTime + now) / 2);
             this._timeOffset = event.time - clientTime;
@@ -115,6 +122,11 @@ class NetClient {
     send(event: NetEvent) {
         if (this.socket.readyState !== this.socket.OPEN) {
             this.pendingEvents.push(event);
+            return;
+        }
+
+        if (this._simulatedLatency > 0) {
+            setTimeout(() => this.socket.send(JSON.stringify(event)), this._simulatedLatency);
             return;
         }
 
