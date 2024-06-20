@@ -51,7 +51,7 @@ export class NetSystem extends System {
                 return;
             }
 
-            const newActor = this.instantiateNetActor(event);
+            const newActor = NetSystem.instantiateNetActor(event);
             if (newActor) {
                 this.scene.add(newActor);
             }
@@ -63,14 +63,14 @@ export class NetSystem extends System {
                 existedActor.kill();
             }
 
-            const newActor = this.instantiateNetActor(event);
+            const newActor = NetSystem.instantiateNetActor(event);
             if (newActor) {
                 this.scene.add(newActor);
             }
         });
     }
 
-    private instantiateNetActor(event: CreateEntityNetEvent | UpdateEntityNetEvent) {
+    public static instantiateNetActor(event: CreateEntityNetEvent | UpdateEntityNetEvent) {
         let actor: NetActor | null = null;
 
         switch (event.entityType as NetEntityType) {

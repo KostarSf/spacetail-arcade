@@ -3,6 +3,7 @@ import { NetEntityType } from "./types";
 export enum NetEventType {
     ServiceClientPing,
     ServiceServerPong,
+    ServiceEntitiesList,
     EntityCreate,
     EntityUpdate,
     EntityKill,
@@ -24,6 +25,13 @@ export abstract class NetEvent {
                 return new ClientPingNetEvent(data);
             case NetEventType.ServiceServerPong:
                 return new ServerPongNetEvent(data);
+            case NetEventType.ServiceEntitiesList:
+                return new EntitiesListEvent({
+                    ...data,
+                    entities: (JSON.parse(data.entities) as any[]).map(
+                        (data) => new CreateEntityNetEvent(data)
+                    ),
+                });
             case NetEventType.EntityCreate:
                 return new CreateEntityNetEvent(data);
             case NetEventType.EntityUpdate:
@@ -67,6 +75,25 @@ export class ServerPongNetEvent extends NetEvent {
             time: this.time,
             serverTime: this.serverTime,
             latency: this.latency,
+        });
+    }
+}
+
+export class EntitiesListEvent extends NetEvent {
+    public readonly type: NetEventType = NetEventType.ServiceEntitiesList;
+    public entities: CreateEntityNetEvent[];
+
+    constructor(data: { entities: CreateEntityNetEvent[]; time: number; latency?: number }) {
+        super(data.time, data.latency);
+        this.entities = data.entities;
+    }
+
+    public serialize(): string {
+        return JSON.stringify({
+            type: this.type,
+            latency: this.latency,
+            time: this.time,
+            entities: "[" + this.entities.map((entity) => entity.serialize()).join(",") + "]",
         });
     }
 }

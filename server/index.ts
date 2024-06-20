@@ -26,7 +26,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 app.listen(PORT, () => {
-    console.log(`Express server is running on port ${PORT}`);
+    console.log(`HTTP server is running on http://localhost:${PORT}`);
 
     runGameServer();
 });

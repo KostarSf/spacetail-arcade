@@ -2,6 +2,7 @@ import { rand } from "~/utils/math";
 import {
     ClientPingNetEvent,
     CreateEntityNetEvent,
+    EntitiesListEvent,
     KillEntityNetEvent,
     NetEvent,
     NetEventType,
@@ -79,6 +80,8 @@ class Network {
                     const serverTime = (event as ServerPongNetEvent).serverTime;
                     this._clockOffset = serverTime - clientTime;
                     break;
+                case NetEventType.ServiceEntitiesList:
+                    this.createEntityEvents.push(...(event as EntitiesListEvent).entities);
                 case NetEventType.EntityCreate:
                     this.createEntityEvents.push(event as CreateEntityNetEvent);
                     break;
