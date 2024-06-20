@@ -1,6 +1,6 @@
 import { Color, DisplayMode, Engine } from "excalibur";
 import { loader } from "./resources";
-import { GameLevel } from "./scenes/GameLevel";
+import { NetScene } from "./scenes/NetScene";
 
 class Game extends Engine {
     constructor() {
@@ -12,8 +12,8 @@ class Game extends Engine {
             backgroundColor: Color.Black,
             canvasElementId: "game",
             scenes: {
-                "game-level": {
-                    scene: GameLevel,
+                [NetScene.Key]: {
+                    scene: NetScene,
                 },
             },
             fixedUpdateFps: 50,
@@ -22,7 +22,7 @@ class Game extends Engine {
 
     initialize() {
         this.start(loader).then(() => {
-            this.goToScene("game-level");
+            this.goToScene(NetScene.Key);
         });
     }
 }

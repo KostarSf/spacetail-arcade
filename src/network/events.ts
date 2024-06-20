@@ -1,113 +1,114 @@
-import { AsteroidSerialize } from "~/actors/asteroid";
+import { NetEntityType } from "./types";
 
-export type AsteroidEntityEventData = {
-    class: "Asteroid";
-    time: number;
-    args: AsteroidSerialize;
-};
+export enum NetEventType {
+    EntityCreate,
+    EntityUpdate,
+    EntityKill,
+}
 
-export type EntityEventData = AsteroidEntityEventData;
+export abstract class NetEvent {
+    public abstract readonly type: NetEventType;
 
-export type NetEntityEvent = {
-    type: "entity";
-    target: string;
-    time: number;
-} & (
-    | {
-          action: "update";
-          data: {
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | { action: "remove" }
-    | {
-          action: "spawn";
-          data: AsteroidEntityEventData;
-      }
-);
+    constructor(public time: number, public latency: number = 0) {}
 
-export type NetPlayerEvent = {
-    type: "player";
-    target: string;
-    time: number;
-} & (
-    | {
-          action: "update";
-          data: {
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | {
-          action: "spawn";
-          data: {
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | {
-          action: "fire";
-          data: {
-              object: "Bullet";
-              objectUuid: string;
-              objectPos: [number, number];
-              objectVel: [number, number];
-              objectDamage: number;
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | {
-          action: "accelerated";
-          data: {
-              value: boolean;
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-    | {
-          action: "rotated";
-          data: {
-              pos: [number, number];
-              vel: [number, number];
-              rotation: number;
-          };
-      }
-);
+    public abstract serialize(): string;
 
-export type NetServerEvent = {
-    type: "server";
-    target: string;
-    time: number;
-} & (
-    | {
-          action: "set-host";
-          data: {
-              isHost: boolean;
-          };
-      }
-    | {
-          action: "players-list";
-          data: { uuid: string; pos: [number, number]; vel: [number, number]; rotation: number }[];
-      }
-    | {
-          action: "entities-list";
-          data: EntityEventData[];
-      }
-    | {
-          action: "pong";
-      }
-);
+    public static parse(message: string) {
+        const data = JSON.parse(message);
+        const type = data.type as NetEventType;
 
-export type NetClientEvent = {
-    type: "ping";
-    time: number;
-};
+        switch (type) {
+            case NetEventType.EntityCreate:
+                return new CreateEntityNetEvent(data);
+            case NetEventType.EntityUpdate:
+                return new UpdateEntityNetEvent(data);
+            case NetEventType.EntityKill:
+                return new KillEntityNetEvent(data);
+            default:
+                return null;
+        }
+    }
+}
 
-export type NetEvent = NetPlayerEvent | NetEntityEvent | NetServerEvent | NetClientEvent;
+export abstract class EntityNetEvent extends NetEvent {
+    constructor(public uuid: string, public entityType: NetEntityType, latency: number = 0) {
+        super(0, latency);
+    }
+}
+
+export class CreateEntityNetEvent<T extends {} = {}> extends EntityNetEvent {
+    public state: T;
+
+    public readonly type: NetEventType = NetEventType.EntityCreate;
+
+    constructor(data: {
+        uuid: string;
+        entityType: NetEntityType;
+        state: T;
+        time?: number;
+        latency?: number;
+    }) {
+        super(data.uuid, data.entityType, data.latency);
+        this.time = data.time ?? 0;
+        this.state = data.state;
+    }
+
+    public serialize(): string {
+        return JSON.stringify({
+            type: this.type,
+            latency: this.latency,
+            time: this.time,
+            uuid: this.uuid,
+            entityType: this.entityType,
+            state: this.state,
+        });
+    }
+}
+
+export class UpdateEntityNetEvent<T extends {} = {}> extends EntityNetEvent {
+    public state: T;
+
+    public readonly type: NetEventType = NetEventType.EntityUpdate;
+
+    constructor(data: {
+        uuid: string;
+        entityType: NetEntityType;
+        state: T;
+        time?: number;
+        latency?: number;
+    }) {
+        super(data.uuid, data.entityType, data.latency);
+        this.state = data.state;
+        this.time = data.time ?? 0;
+    }
+
+    public serialize(): string {
+        return JSON.stringify({
+            type: this.type,
+            latency: this.latency,
+            time: this.time,
+            uuid: this.uuid,
+            entityType: this.entityType,
+            state: this.state,
+        });
+    }
+}
+
+export class KillEntityNetEvent extends EntityNetEvent {
+    public readonly type: NetEventType = NetEventType.EntityKill;
+
+    constructor(data: { uuid: string; entityType: NetEntityType; time?: number; latency?: number }) {
+        super(data.uuid, data.entityType, data.latency);
+        this.time = data.time ?? 0;
+    }
+
+    public serialize(): string {
+        return JSON.stringify({
+            type: this.type,
+            latency: this.latency,
+            time: this.time,
+            uuid: this.uuid,
+            entityType: this.entityType,
+        });
+    }
+}

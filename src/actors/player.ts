@@ -1,171 +1,130 @@
-import { Color, Engine, Keys, PointerButton } from "excalibur";
-import { netClient } from "../network/NetClient";
-import { easeOut, lerp, linInt, round, vecToArray } from "../utils/math";
-import { Bullet } from "./bullet";
-import { Ship, ShipOptions } from "./ship";
+import {
+    CollisionType,
+    Engine,
+    GraphicsGroup,
+    PointerButton,
+    PolygonCollider,
+    Vector,
+    vec,
+} from "excalibur";
+import { NetBodyComponent } from "~/ecs/physics.ecs";
+import { ShadowedSprite } from "~/graphics/ShadowedSprite";
+import { NetActor } from "~/network/NetActor";
+import { NetEntityType, SerializedVector } from "~/network/types";
+import { Resources } from "~/resources";
+import { round, vecToArray } from "~/utils/math";
 
-export class Player extends Ship {
-    public static readonly Tag: string = "client-player";
+export interface PlayerState {
+    pos: SerializedVector;
+    vel: SerializedVector;
+    accelerated: boolean;
+    rotation: number;
+}
 
-    private isMouseControl: boolean = true;
+export interface PlayerOptions {
+    pos: Vector;
+}
 
-    constructor(options: ShipOptions) {
-        super({ ...options, name: options.name ?? "Player", healthColor: Color.Green });
-        this.addTag("player");
-        this.addTag(Player.Tag);
+export class Player extends NetActor<PlayerState> {
+    public type: NetEntityType = NetEntityType.Player;
+
+    public accelerated = false;
+
+    constructor(options?: PlayerOptions) {
+        super({
+            pos: options?.pos,
+            name: "Player",
+            collider: new PolygonCollider({
+                points: [vec(-10, -10), vec(15, 0), vec(-10, 10)],
+            }),
+            collisionType: CollisionType.Passive,
+        });
+
+        this.addComponent(new NetBodyComponent({ mass: 10 }));
     }
 
-    override set accelerated(value: boolean) {
-        if (value !== this.accelerated) {
-            netClient.send({
-                type: "player",
-                target: this.uuid,
-                action: "accelerated",
-                time: netClient.getTime(),
-                data: {
-                    value: value,
-                    ...this.serialize(),
-                },
-            });
-        }
+    onInitialize(engine: Engine<any>): void {
+        this.graphics.add(
+            new GraphicsGroup({
+                members: [{ graphic: ShadowedSprite.from(Resources.Player), offset: Vector.Zero }],
+            })
+        );
 
-        super.accelerated = value;
-    }
-
-    public override fire(): Bullet | undefined {
-        const bullet = super.fire();
-
-        if (!bullet) {
+        if (this.isReplica) {
             return;
         }
 
-        this.scene?.camera.shake(3, 3, 100);
-
-        netClient.send({
-            type: "player",
-            target: this.uuid,
-            action: "fire",
-            time: netClient.getTime(),
-            data: {
-                object: "Bullet",
-                objectUuid: bullet.uuid,
-                objectPos: [bullet.pos.x, bullet.pos.y],
-                objectVel: [bullet.vel.x, bullet.vel.y],
-                objectDamage: bullet.damage,
-                ...this.serialize(),
-            },
-        });
-
-        return bullet;
-    }
-
-    onInitialize(engine: Engine): void {
-        super.onInitialize(engine);
-
-        this.health.events.on("damage", (evt) => {
-            const scale = Math.max(10, evt.amount / 3);
-            engine.currentScene.camera.shake(scale, scale, 200);
-        });
-
-        engine.input.pointers.primary.on("move", () => {
-            this.isMouseControl = true;
-        });
         engine.input.pointers.primary.on("down", (evt) => {
+            let accelerated = this.accelerated;
+
             if (evt.button === PointerButton.Right) {
-                this.accelerated = true;
+                accelerated = true;
             }
 
-            if (evt.button === PointerButton.Left) {
-                this.fire();
+            if (accelerated !== this.accelerated) {
+                this.accelerated = accelerated;
+                this.markStale();
             }
         });
         engine.input.pointers.primary.on("up", (evt) => {
+            let accelerated = this.accelerated;
+
             if (evt.button === PointerButton.Right) {
-                this.accelerated = false;
-            }
-        });
-        engine.input.keyboard.on("press", (evt) => {
-            if (evt.key === Keys.W) {
-                this.accelerated = true;
+                accelerated = false;
             }
 
-            if (evt.key === Keys.Space) {
-                this.fire();
+            if (accelerated !== this.accelerated) {
+                this.accelerated = accelerated;
+                this.markStale();
             }
         });
-        engine.input.keyboard.on("release", (evt) => {
-            if (evt.key === Keys.W) {
-                this.accelerated = false;
-            }
-        });
-
-        engine.currentScene.camera.strategy.radiusAroundActor(this, 50);
     }
 
-    onPostUpdate(engine: Engine, elapsedMs: number): void {
-        super.onPostUpdate(engine, elapsedMs);
-
-        const delta = elapsedMs / 1000;
-        this.updateInputControlls(engine, delta);
-        this.updateCameraZoom(engine, delta);
-
-        if (this.ship.accelerated) {
-            const power = 1 + linInt(this.vel.squareDistance(), 0, 1_000_000, 0, 1) * 2;
-            this.scene?.camera.shake(power, power, 100);
-        }
-    }
-
-    private oldSendedRotation: number = 0;
-
-    private updateInputControlls(engine: Engine, delta: number) {
-        let rotationMoment = 0;
-        if (engine.input.keyboard.isHeld(Keys.A)) {
-            this.isMouseControl = false;
-            rotationMoment -= 1;
-        }
-        if (engine.input.keyboard.isHeld(Keys.D)) {
-            this.isMouseControl = false;
-            rotationMoment += 1;
-        }
-
-        let newRotation = this.rotation;
-        if (this.isMouseControl) {
+    onPostUpdate(engine: Engine<any>, delta: number): void {
+        if (!this.isReplica) {
             const cursorScreenPos = engine.input.pointers.primary.lastScreenPos;
             const rotationTarget = engine.screenToWorldCoordinates(cursorScreenPos);
-            newRotation = rotationTarget.sub(this.pos).toAngle();
-        } else {
-            newRotation = this.rotation + rotationMoment * delta * 4;
+            const newRotation = round(rotationTarget.sub(this.pos).toAngle(), 2);
+
+            if (newRotation !== this.rotation) {
+                this.rotation = newRotation;
+                this.markStale();
+            }
         }
 
-        this.rotation = newRotation;
+        this.vel = this.applyMovement(delta / 1000);
+    }
 
-        if (Math.abs(this.rotation - this.oldSendedRotation) > 0.01) {
-            this.oldSendedRotation = this.rotation;
-            netClient.send({
-                type: "player",
-                target: this.uuid,
-                action: "rotated",
-                time: netClient.getTime(),
-                data: this.serialize(),
-            });
+    private applyMovement(delta: number) {
+        if (this.accelerated) {
+            return this.vel.add(Vector.fromAngle(this.rotation).scale(150 * delta));
         }
+
+        const movementDecay = Math.pow(0.9, delta);
+        return this.vel.scale(movementDecay);
     }
 
-    private updateCameraZoom(engine: Engine, delta: number) {
-        const speed = this.vel.distance();
-
-        const zoomFactor = lerp(speed, 0, 1000, easeOut);
-        const newZoom = 1.1 - zoomFactor * 0.4;
-
-        const lastZoom = engine.currentScene.camera.zoom;
-        engine.currentScene.camera.zoom = lastZoom + (newZoom - lastZoom) * delta * 2;
-    }
-
-    public serialize() {
+    public serializeState(): PlayerState {
         return {
             pos: vecToArray(this.pos, 2),
             vel: vecToArray(this.vel, 2),
             rotation: round(this.rotation, 2),
+            accelerated: this.accelerated,
         };
+    }
+
+    public updateState(state: PlayerState, latency: number): void {
+        this.pos = vec(...state.pos);
+        this.vel = vec(...state.vel);
+        this.rotation = state.rotation;
+        this.accelerated = state.accelerated;
+
+        const delta = latency / 1000;
+
+        const newVel = this.applyMovement(delta);
+        const avgVel = this.vel.add(newVel).scaleEqual(0.5);
+
+        this.pos.addEqual(avgVel.scaleEqual(delta));
+        this.vel = newVel;
     }
 }
