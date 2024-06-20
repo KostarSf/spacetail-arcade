@@ -1,4 +1,5 @@
 import { WebSocketServer } from "ws";
+import { NetEvent, NetEventType, ServerPongNetEvent } from "~/network/events";
 
 export function runGameServer(port?: number) {
     const server = new WebSocketServer({ port: port ?? 8080 });
@@ -7,13 +8,29 @@ export function runGameServer(port?: number) {
         console.log(`New client connected (${server.clients.size})`);
 
         ws.on("message", (message) => {
+            const event = NetEvent.parse(message.toString());
+            if (!event) {
+                return;
+            }
+
+            // console.log(event);
+
+            if (event.type === NetEventType.ServiceClientPing) {
+                ws.send(
+                    new ServerPongNetEvent({
+                        time: event.time,
+                        serverTime: Date.now(),
+                        latency: event.latency,
+                    }).serialize()
+                );
+                return;
+            }
+
             server.clients.forEach((socket) => {
                 if (socket !== ws) {
-                    socket.send(message);
+                    socket.send(event.serialize());
                 }
             });
-
-            console.log(message.toString());
         });
 
         ws.on("close", () => {

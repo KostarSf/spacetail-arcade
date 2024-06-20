@@ -2,6 +2,8 @@ import { Engine, Scene, vec } from "excalibur";
 import { Player } from "~/actors/Player";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
 import { NetSystem } from "~/network/NetSystem";
+import Network from "~/network/Network";
+import { UI } from "~/ui/web-ui";
 import { rand } from "~/utils/math";
 
 export class NetScene extends Scene {
@@ -20,5 +22,10 @@ export class NetScene extends Scene {
                 pos: vec(rand.integer(50, 350), rand.integer(50, 350)),
             })
         );
+    }
+
+    onPostUpdate(_engine: Engine<any>, _delta: number): void {
+        const debug = `ping: ${Network.ping}ms, clock offset: ${Network.clockOffset}ms`;
+        UI.debugText.setText(debug)
     }
 }

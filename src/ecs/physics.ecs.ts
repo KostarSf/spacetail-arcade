@@ -56,7 +56,7 @@ export class NetBodyComponent extends Component {
 
             const target = precollision.target.owner;
             const other = precollision.other.owner;
-            if (target.get(NetComponent).isReplica || !other.has(NetBodyComponent)) {
+            if (!other.has(NetBodyComponent)) {
                 return;
             }
 
