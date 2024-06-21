@@ -1,6 +1,7 @@
-import { Scene, System, SystemType } from "excalibur";
+import { Query, Scene, System, SystemType, World } from "excalibur";
 import { Player } from "~/actors/Player";
 import { Asteroid } from "~/actors/asteroid";
+import { Bullet } from "~/actors/bullet";
 import { NetActor } from "./NetActor";
 import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
@@ -10,35 +11,55 @@ import { NetEntityType } from "./types";
 export class NetSystem extends System {
     systemType: SystemType = SystemType.Update;
 
-    private netActorsMap: Map<string, NetActor>;
-    private scene: Scene;
+    private netActors: Map<string, NetActor>;
 
-    constructor(scene: Scene) {
+    private scene!: Scene;
+    private query!: Query<typeof NetStateComponent>;
+
+    constructor() {
         super();
+        this.netActors = new Map();
+    }
 
-        this.netActorsMap = new Map();
+    initialize(world: World, scene: Scene<unknown>): void {
         this.scene = scene;
+        this.query = world.query([NetStateComponent]);
+
+        this.query.entityAdded$.subscribe((entity) => {
+            const actor = entity as NetActor;
+            if (!this.netActors.has(actor.uuid)) {
+                this.netActors.set(actor.uuid, actor);
+            }
+        });
+        this.query.entityRemoved$.subscribe((entity) => {
+            this.netActors.delete(entity.get(NetStateComponent).uuid);
+        });
     }
 
     update(_elapsedMs: number): void {
         const netState = Network.sliceState();
 
-        netState.killedEntities.forEach((uuid) => {
-            const actor = this.netActorsMap.get(uuid);
+        netState.createEntityEvents.forEach((event) => {
+            const existedActor = this.netActors.get(event.uuid);
+            if (existedActor) {
+                this.netActors.delete(event.uuid);
+                existedActor.kill();
+            }
 
-            if (actor) {
-                this.netActorsMap.delete(uuid);
-                actor.kill();
+            const newActor = this.instantiateNetActor(event);
+            if (newActor) {
+                this.netActors.set(event.uuid, newActor);
+                this.scene.add(newActor);
             }
         });
 
         netState.updateEntityEvents.forEach((event) => {
-            const actor = this.netActorsMap.get(event.uuid);
+            const actor = this.netActors.get(event.uuid);
 
             if (!actor) {
-                const newActor = NetSystem.instantiateNetActor(event);
+                const newActor = this.instantiateNetActor(event);
                 if (newActor) {
-                    this.netActorsMap.set(event.uuid, newActor);
+                    this.netActors.set(event.uuid, newActor);
                     this.scene.add(newActor);
                 }
 
@@ -52,25 +73,31 @@ export class NetSystem extends System {
                 });
                 actor.addComponent(netState, true);
             }
-            actor.updateState(event.state, event.latency);
+            actor.updateState(event.state, event.latency, this.netActors);
         });
 
-        netState.createEntityEvents.forEach((event) => {
-            const existedActor = this.netActorsMap.get(event.uuid);
-            if (existedActor) {
-                this.netActorsMap.delete(event.uuid);
-                existedActor.kill();
+        netState.entityActionsEvents.forEach((event) => {
+            const actor = this.netActors.get(event.uuid);
+            console.log(actor?.isKilled(), actor);
+
+            if (!actor || actor.isKilled()) {
+                return;
             }
 
-            const newActor = NetSystem.instantiateNetActor(event);
-            if (newActor) {
-                this.netActorsMap.set(event.uuid, newActor);
-                this.scene.add(newActor);
+            actor._receiveAction(event.action, event.latency);
+        });
+
+        netState.killedEntities.forEach((uuid) => {
+            const actor = this.netActors.get(uuid);
+
+            if (actor) {
+                this.netActors.delete(uuid);
+                actor.kill();
             }
         });
     }
 
-    public static instantiateNetActor(event: EntityWithStateNetEvent): NetActor | null {
+    private instantiateNetActor(event: EntityWithStateNetEvent): NetActor | null {
         switch (event.entityType as NetEntityType) {
             case NetEntityType.Player:
                 const player = new Player({ uuid: event.uuid, isReplica: event.isReplica });
@@ -79,7 +106,10 @@ export class NetSystem extends System {
                 return player;
 
             case NetEntityType.Bullet:
-                return null;
+                const bullet = new Bullet({ uuid: event.uuid, isReplica: event.isReplica });
+                bullet.updateState(event.state as any, event.latency, this.netActors);
+
+                return bullet;
 
             case NetEntityType.Asteroid:
                 const asteroid = new Asteroid({ uuid: event.uuid, isReplica: event.isReplica });

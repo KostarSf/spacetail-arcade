@@ -2,7 +2,8 @@ import { CollisionType, Color, Engine, TwoPI, Vector } from "excalibur";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
-import { NetEntityType, SerializedVector } from "~/network/types";
+import { ActionEvent } from "~/network/events";
+import { ActionEventType, NetEntityType, SerializedVector } from "~/network/types";
 import { round, vec, vecToArray } from "~/utils/math";
 import { Resources } from "../resources";
 
@@ -105,5 +106,12 @@ export class Asteroid extends NetActor<AsteroidState> {
         this.rotation += newRotation + (newRotation < 0 ? TwoPI : 0);
         this.pos.addEqual(this.vel.scale(delta));
         this.netBody.mass = state.mass;
+    }
+
+    protected receiveAction(action: ActionEvent, _latency: number): void {
+        switch (action.type) {
+            case ActionEventType.Damage:
+                this.kill();
+        }
     }
 }

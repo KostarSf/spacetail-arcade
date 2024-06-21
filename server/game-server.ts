@@ -6,11 +6,10 @@ import {
     EntityNetEvent,
     KillEntityNetEvent,
     NetEvent,
-    NetEventType,
     ServerPongNetEvent,
     UpdateEntityNetEvent,
 } from "~/network/events";
-import { NetEntityType } from "~/network/types";
+import { NetEntityType, NetEventType, NetReceiverType } from "~/network/types";
 
 class PlayerConnection {
     public hostEntities: Map<string, ServerEntity>;
@@ -172,7 +171,7 @@ export function runGameServer(port?: number) {
             }
 
             server.clients.forEach((socket) => {
-                if (socket !== ws) {
+                if (socket !== ws || event.receiver === NetReceiverType.AllClients) {
                     socket.send(event.serialize());
                 }
             });

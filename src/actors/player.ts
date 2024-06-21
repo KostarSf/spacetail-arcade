@@ -11,9 +11,11 @@ import {
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
-import { NetEntityType, SerializedVector } from "~/network/types";
+import { ActionEvent } from "~/network/events";
+import { ActionEventType, NetEntityType, SerializedVector } from "~/network/types";
 import { Resources } from "~/resources";
 import { round, vecToArray } from "~/utils/math";
+import { Bullet } from "./bullet";
 
 export interface PlayerState {
     pos: SerializedVector;
@@ -72,19 +74,30 @@ export class Player extends NetActor<PlayerState> {
             return;
         }
 
-        engine.input.pointers.primary.on("down", (evt) => {
-            let accelerated = this.accelerated;
-
+        engine.input.pointers.on("down", (evt) => {
             if (evt.button === PointerButton.Right) {
-                accelerated = true;
+                if (this.accelerated !== true) {
+                    this.accelerated = true;
+                    this.markStale();
+                }
             }
 
-            if (accelerated !== this.accelerated) {
-                this.accelerated = accelerated;
-                this.markStale();
+            if (evt.button === PointerButton.Left) {
+                const direction = Vector.fromAngle(this.rotation);
+                const pos = this.pos.add(direction.scale(15));
+                const vel = this.vel.add(direction.scale(350));
+
+                const bullet = new Bullet({
+                    shooter: this,
+                    pos,
+                    vel,
+                    rotation: this.rotation,
+                    damage: 10,
+                });
+                this.scene?.add(bullet);
             }
         });
-        engine.input.pointers.primary.on("up", (evt) => {
+        engine.input.pointers.on("up", (evt) => {
             let accelerated = this.accelerated;
 
             if (evt.button === PointerButton.Right) {
@@ -144,5 +157,12 @@ export class Player extends NetActor<PlayerState> {
 
         this.pos.addEqual(avgVel.scaleEqual(delta));
         this.vel = newVel;
+    }
+
+    protected receiveAction(action: ActionEvent, _latency: number): void {
+        switch (action.type) {
+            case ActionEventType.Damage:
+                this.kill();
+        }
     }
 }

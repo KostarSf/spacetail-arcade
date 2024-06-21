@@ -1,18 +1,13 @@
-import { NetEntityType } from "./types";
-
-export enum NetEventType {
-    ServiceClientPing,
-    ServiceServerPong,
-    ServiceEntitiesList,
-    EntityCreate,
-    EntityUpdate,
-    EntityKill,
-}
+import { ActionEventType, NetEntityType, NetEventType, NetReceiverType } from "./types";
 
 export abstract class NetEvent {
-    public abstract readonly type: NetEventType;
+    public receiver: NetReceiverType = NetReceiverType.NotSender;
 
-    constructor(public time: number, public latency: number = 0) {}
+    constructor(
+        public readonly type: NetEventType,
+        public time: number,
+        public latency: number = 0
+    ) {}
 
     public abstract serialize(): string;
 
@@ -20,11 +15,16 @@ export abstract class NetEvent {
         const data = JSON.parse(message);
         const type = data.type as NetEventType;
 
+        let netEvent: NetEvent | null = null;
         switch (type) {
             case NetEventType.ServiceClientPing:
-                return new ClientPingNetEvent(data);
+                netEvent = new ClientPingNetEvent(data);
+                break;
+
             case NetEventType.ServiceServerPong:
-                return new ServerPongNetEvent(data);
+                netEvent = new ServerPongNetEvent(data);
+                break;
+
             case NetEventType.ServiceEntitiesList:
                 const batchData = JSON.parse(data.entities) as { type: NetEventType }[];
                 if (batchData.length === 0) {
@@ -44,31 +44,56 @@ export abstract class NetEvent {
                     return null;
                 }
 
-                return new EntitiesListEvent({
+                netEvent = new EntitiesListEvent({
                     ...data,
                     entities: batchData.map((data: any) => new batchEvent(data)),
                 });
+                break;
+
             case NetEventType.EntityCreate:
-                return new CreateEntityNetEvent(data);
+                netEvent = new CreateEntityNetEvent(data);
+                break;
+
             case NetEventType.EntityUpdate:
-                return new UpdateEntityNetEvent(data);
+                netEvent = new UpdateEntityNetEvent(data);
+                break;
+
             case NetEventType.EntityKill:
-                return new KillEntityNetEvent(data);
-            default:
-                return null;
+                netEvent = new KillEntityNetEvent(data);
+                break;
+
+            case NetEventType.EntityAction:
+                const actionType = (data as EntityActionNetEvent).actionType;
+                let action: ActionEvent | null = null;
+
+                if (actionType === ActionEventType.Damage) {
+                    action = new DamageAction(JSON.parse(data.action));
+                }
+
+                if (action) {
+                    netEvent = new EntityActionNetEvent({ ...data, action });
+                }
+
+                break;
         }
+
+        if (!netEvent) {
+            return null;
+        }
+
+        netEvent.receiver = data.receiver;
+        return netEvent;
     }
 }
 
 export class ClientPingNetEvent extends NetEvent {
-    public readonly type: NetEventType = NetEventType.ServiceClientPing;
-
     constructor(data: { time: number; latency?: number }) {
-        super(data.time, data.latency);
+        super(NetEventType.ServiceClientPing, data.time, data.latency);
     }
 
     public serialize(): string {
         return JSON.stringify({
+            receiver: this.receiver,
             type: this.type,
             time: this.time,
             latency: this.latency,
@@ -77,16 +102,16 @@ export class ClientPingNetEvent extends NetEvent {
 }
 
 export class ServerPongNetEvent extends NetEvent {
-    public readonly type: NetEventType = NetEventType.ServiceServerPong;
     public serverTime: number;
 
     constructor(data: { time: number; serverTime: number; latency?: number }) {
-        super(data.time, data.latency);
+        super(NetEventType.ServiceServerPong, data.time, data.latency);
         this.serverTime = data.serverTime;
     }
 
     public serialize(): string {
         return JSON.stringify({
+            receiver: this.receiver,
             type: this.type,
             time: this.time,
             serverTime: this.serverTime,
@@ -96,16 +121,16 @@ export class ServerPongNetEvent extends NetEvent {
 }
 
 export class EntitiesListEvent extends NetEvent {
-    public readonly type: NetEventType = NetEventType.ServiceEntitiesList;
     public entities: EntityWithStateNetEvent[];
 
     constructor(data: { entities: EntityWithStateNetEvent[]; time: number; latency?: number }) {
-        super(data.time, data.latency);
+        super(NetEventType.ServiceEntitiesList, data.time, data.latency);
         this.entities = data.entities;
     }
 
     public serialize(): string {
         return JSON.stringify({
+            receiver: this.receiver,
             type: this.type,
             latency: this.latency,
             time: this.time,
@@ -115,26 +140,30 @@ export class EntitiesListEvent extends NetEvent {
 }
 
 export abstract class EntityNetEvent extends NetEvent {
-    constructor(public uuid: string, public entityType: NetEntityType, latency: number = 0) {
-        super(0, latency);
+    constructor(
+        type: NetEventType,
+        public uuid: string,
+        public entityType: NetEntityType,
+        latency: number = 0
+    ) {
+        super(type, 0, latency);
     }
 }
 
 export abstract class EntityWithStateNetEvent<T extends {} = {}> extends EntityNetEvent {
     constructor(
+        type: NetEventType,
         uuid: string,
         entityType: NetEntityType,
         public state: T,
         public isReplica = true,
         latency: number = 0
     ) {
-        super(uuid, entityType, latency);
+        super(type, uuid, entityType, latency);
     }
 }
 
 export class CreateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetEvent<T> {
-    public readonly type: NetEventType = NetEventType.EntityCreate;
-
     constructor(data: {
         uuid: string;
         entityType: NetEntityType;
@@ -143,12 +172,20 @@ export class CreateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetE
         time?: number;
         latency?: number;
     }) {
-        super(data.uuid, data.entityType, data.state, data.isReplica, data.latency);
+        super(
+            NetEventType.EntityCreate,
+            data.uuid,
+            data.entityType,
+            data.state,
+            data.isReplica,
+            data.latency
+        );
         this.time = data.time ?? 0;
     }
 
     public serialize(): string {
         return JSON.stringify({
+            receiver: this.receiver,
             type: this.type,
             latency: this.latency,
             time: this.time,
@@ -161,8 +198,6 @@ export class CreateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetE
 }
 
 export class UpdateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetEvent<T> {
-    public readonly type: NetEventType = NetEventType.EntityUpdate;
-
     constructor(data: {
         uuid: string;
         entityType: NetEntityType;
@@ -171,12 +206,20 @@ export class UpdateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetE
         time?: number;
         latency?: number;
     }) {
-        super(data.uuid, data.entityType, data.state, data.isReplica, data.latency);
+        super(
+            NetEventType.EntityUpdate,
+            data.uuid,
+            data.entityType,
+            data.state,
+            data.isReplica,
+            data.latency
+        );
         this.time = data.time ?? 0;
     }
 
     public serialize(): string {
         return JSON.stringify({
+            receiver: this.receiver,
             type: this.type,
             latency: this.latency,
             time: this.time,
@@ -189,25 +232,82 @@ export class UpdateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetE
 }
 
 export class KillEntityNetEvent extends EntityNetEvent {
-    public readonly type: NetEventType = NetEventType.EntityKill;
-
     constructor(data: {
         uuid: string;
         entityType: NetEntityType;
         time?: number;
         latency?: number;
     }) {
-        super(data.uuid, data.entityType, data.latency);
+        super(NetEventType.EntityKill, data.uuid, data.entityType, data.latency);
         this.time = data.time ?? 0;
     }
 
     public serialize(): string {
         return JSON.stringify({
+            receiver: this.receiver,
             type: this.type,
             latency: this.latency,
             time: this.time,
             uuid: this.uuid,
             entityType: this.entityType,
+        });
+    }
+}
+
+export class EntityActionNetEvent<T extends ActionEvent = never> extends EntityNetEvent {
+    actionType: ActionEventType;
+    action: T;
+
+    constructor(data: {
+        uuid: string;
+        entityType: NetEntityType;
+        action: T;
+        time?: number;
+        latency?: number;
+    }) {
+        super(NetEventType.EntityAction, data.uuid, data.entityType, data.latency);
+        this.time = data.time ?? 0;
+        this.actionType = data.action.type;
+        this.action = data.action;
+    }
+
+    public serialize(): string {
+        return JSON.stringify({
+            receiver: this.receiver,
+            type: this.type,
+            latency: this.latency,
+            time: this.time,
+            uuid: this.uuid,
+            entityType: this.entityType,
+            actionType: this.actionType,
+            action: this.action.serialize(),
+        });
+    }
+}
+
+export abstract class ActionEvent {
+    public abstract readonly type: ActionEventType;
+
+    public abstract serialize(): string;
+}
+
+export class DamageAction extends ActionEvent {
+    public readonly type: ActionEventType = ActionEventType.Damage;
+
+    public amount: number;
+    public direction: number | null;
+
+    constructor(data: { amount: number; direction?: number | null }) {
+        super();
+
+        this.amount = data.amount;
+        this.direction = data.direction ?? null;
+    }
+
+    public serialize(): string {
+        return JSON.stringify({
+            amount: this.amount,
+            direction: this.direction ? Math.round(this.direction * 100) / 100 : null,
         });
     }
 }

@@ -3,17 +3,20 @@ import {
     ClientPingNetEvent,
     CreateEntityNetEvent,
     EntitiesListEvent,
+    EntityActionNetEvent,
     KillEntityNetEvent,
     NetEvent,
-    NetEventType,
     ServerPongNetEvent,
     UpdateEntityNetEvent,
 } from "./events";
+import { NetEventType } from "./types";
 
 export interface NetworkStateSlice {
     createEntityEvents: CreateEntityNetEvent[];
     updateEntityEvents: UpdateEntityNetEvent[];
     killedEntities: Set<string>;
+
+    entityActionsEvents: EntityActionNetEvent[];
 }
 
 class Network {
@@ -25,6 +28,7 @@ class Network {
     private createEntityEvents: CreateEntityNetEvent[];
     private updateEntityEvents: UpdateEntityNetEvent[];
     private killedEntities: Set<string>;
+    private entityActionsEvents: EntityActionNetEvent[];
 
     private simulatedLatency = rand.integer(0, 30);
     private simulatedClockDrift = rand.integer(-300, 300);
@@ -52,6 +56,7 @@ class Network {
         this.createEntityEvents = [];
         this.updateEntityEvents = [];
         this.killedEntities = new Set();
+        this.entityActionsEvents = [];
 
         this.host = host;
         this.socket = null;
@@ -119,6 +124,11 @@ class Network {
                     this.killedEntities.add((event as KillEntityNetEvent).uuid);
 
                     break;
+
+                case NetEventType.EntityAction:
+                    this.entityActionsEvents.push(event as EntityActionNetEvent);
+
+                    break;
             }
         });
 
@@ -175,11 +185,13 @@ class Network {
 
         const updateEvents = this.updateEntityEvents.splice(0, this.updateEntityEvents.length);
         const createEvents = this.createEntityEvents.splice(0, this.createEntityEvents.length);
+        const actionEvents = this.entityActionsEvents.splice(0, this.entityActionsEvents.length);
 
         return {
             createEntityEvents: createEvents,
             updateEntityEvents: updateEvents,
             killedEntities: killedEntities,
+            entityActionsEvents: actionEvents,
         };
     }
 }

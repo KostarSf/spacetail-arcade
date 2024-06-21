@@ -1,7 +1,13 @@
 import { Actor, ActorArgs } from "excalibur";
 import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
-import { CreateEntityNetEvent, KillEntityNetEvent, UpdateEntityNetEvent } from "./events";
+import {
+    ActionEvent,
+    CreateEntityNetEvent,
+    EntityActionNetEvent,
+    KillEntityNetEvent,
+    UpdateEntityNetEvent,
+} from "./events";
 import { NetEntityType } from "./types";
 
 export interface NetActorOptions extends ActorArgs {
@@ -20,7 +26,9 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
 
     constructor(options: NetActorOptions = {}) {
         super(options);
-        this.addComponent(new NetStateComponent({ uuid: options.uuid, isReplica: options.isReplica }));
+        this.addComponent(
+            new NetStateComponent({ uuid: options.uuid, isReplica: options.isReplica })
+        );
 
         this.on("initialize", () => {
             if (!this.isReplica) {
@@ -69,9 +77,33 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
     }
 
     public abstract serializeState(): NetState;
-    public abstract updateState(state: NetState, latency: number): void;
+    public abstract updateState(
+        state: NetState,
+        latency: number,
+        actors: Map<string, NetActor>
+    ): void;
 
     public markStale(state = true) {
         this._dirty = state;
     }
+
+    public sendAction(action: ActionEvent) {
+        if (!this.isReplica) {
+            this.receiveAction(action, 0);
+        }
+
+        const entityActionEvent = new EntityActionNetEvent({
+            uuid: this.uuid,
+            entityType: this.type,
+            action,
+        });
+        Network.sendEvent(entityActionEvent);
+    }
+
+    /** @internal */
+    public _receiveAction(action: ActionEvent, latency: number): void {
+        this.receiveAction(action, latency);
+    }
+
+    protected receiveAction(_action: ActionEvent, _latency: number): void {}
 }
