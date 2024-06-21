@@ -16,6 +16,8 @@ export interface AsteroidState {
 
 export interface AsteroidOptions {
     uuid?: string;
+    isReplica?: boolean;
+
     pos?: Vector | [number, number];
     vel?: Vector | [number, number];
     mass?: number;
@@ -39,6 +41,9 @@ export class Asteroid extends NetActor<AsteroidState> {
 
         super({
             name: "Asteroid",
+            uuid: options.uuid,
+            isReplica: options.isReplica,
+
             pos: options.pos ? vec(options.pos) : undefined,
             vel: options.vel ? vec(options.vel) : undefined,
             rotation: options.rotation,

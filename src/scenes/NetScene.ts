@@ -55,7 +55,7 @@ export class NetScene extends Scene {
     }
 
     private trySpawnAsteroids() {
-        const maxAsteroidsCount = 5;
+        const maxAsteroidsCount = 4;
 
         if (this.asteroidsQuery.entities.length >= maxAsteroidsCount) {
             return;
@@ -66,7 +66,7 @@ export class NetScene extends Scene {
             return;
         }
 
-        const posLimit = 20;
+        const posLimit = 150;
         const velLimit = 0;
 
         const asteroid = new Asteroid({
@@ -74,7 +74,7 @@ export class NetScene extends Scene {
             vel: vec(rand.floating(-velLimit, velLimit), rand.floating(-velLimit, velLimit)),
             rotation: rand.floating(0, Math.PI * 2),
             angularVelocity: rand.floating(-1, 1),
-            mass: rand.integer(30, 300),
+            mass: rand.integer(100, 300),
         });
         this.add(asteroid);
     }

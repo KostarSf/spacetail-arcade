@@ -1,15 +1,13 @@
 import { Actor, ActorArgs } from "excalibur";
-import { NetComponent } from "./NetComponent";
+import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
-import {
-    CreateEntityNetEvent,
-    EntityWithStateNetEvent,
-    KillEntityNetEvent,
-    UpdateEntityNetEvent,
-} from "./events";
+import { CreateEntityNetEvent, KillEntityNetEvent, UpdateEntityNetEvent } from "./events";
 import { NetEntityType } from "./types";
 
-export interface NetActorOptions extends ActorArgs {}
+export interface NetActorOptions extends ActorArgs {
+    uuid?: string;
+    isReplica?: boolean;
+}
 
 export abstract class NetActor<NetState extends {} = {}> extends Actor {
     private _dirty: boolean = false;
@@ -22,7 +20,7 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
 
     constructor(options: NetActorOptions = {}) {
         super(options);
-        this.addComponent(new NetComponent());
+        this.addComponent(new NetStateComponent({ uuid: options.uuid, isReplica: options.isReplica }));
 
         this.on("initialize", () => {
             if (!this.isReplica) {
@@ -63,11 +61,11 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
     }
 
     get uuid() {
-        return this.get(NetComponent).uuid;
+        return this.get(NetStateComponent).uuid;
     }
 
     get isReplica() {
-        return this.get(NetComponent).isReplica;
+        return this.get(NetStateComponent).isReplica;
     }
 
     public abstract serializeState(): NetState;
@@ -75,12 +73,5 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
 
     public markStale(state = true) {
         this._dirty = state;
-    }
-
-    public static fromEventState<T extends NetActor>(object: T, event: EntityWithStateNetEvent) {
-        object.get(NetComponent).isReplica = event.isReplica;
-        object.updateState(event.state, event.latency);
-
-        return object;
     }
 }

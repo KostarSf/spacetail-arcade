@@ -2,7 +2,7 @@ import { Scene, System, SystemType } from "excalibur";
 import { Player } from "~/actors/Player";
 import { Asteroid } from "~/actors/asteroid";
 import { NetActor } from "./NetActor";
-import { NetComponent } from "./NetComponent";
+import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
 import { EntityWithStateNetEvent } from "./events";
 import { NetEntityType } from "./types";
@@ -33,9 +33,9 @@ export class NetSystem extends System {
         });
 
         netState.updateEntityEvents.forEach((event) => {
-            const existedActor = this.netActorsMap.get(event.uuid);
+            const actor = this.netActorsMap.get(event.uuid);
 
-            if (!existedActor) {
+            if (!actor) {
                 const newActor = NetSystem.instantiateNetActor(event);
                 if (newActor) {
                     this.netActorsMap.set(event.uuid, newActor);
@@ -45,8 +45,14 @@ export class NetSystem extends System {
                 return;
             }
 
-            existedActor.get(NetComponent).isReplica = event.isReplica;
-            existedActor.updateState(event.state, event.latency);
+            if (actor.isReplica !== event.isReplica) {
+                const netState = new NetStateComponent({
+                    uuid: event.uuid,
+                    isReplica: event.isReplica,
+                });
+                actor.addComponent(netState, true);
+            }
+            actor.updateState(event.state, event.latency);
         });
 
         netState.createEntityEvents.forEach((event) => {
@@ -64,24 +70,24 @@ export class NetSystem extends System {
         });
     }
 
-    public static instantiateNetActor(event: EntityWithStateNetEvent) {
-        let actor: NetActor | null = null;
-
+    public static instantiateNetActor(event: EntityWithStateNetEvent): NetActor | null {
         switch (event.entityType as NetEntityType) {
             case NetEntityType.Player:
-                actor = NetActor.fromEventState(new Player(), event);
+                const player = new Player({ uuid: event.uuid, isReplica: event.isReplica });
+                player.updateState(event.state as any, event.latency);
 
-                break;
+                return player;
 
             case NetEntityType.Bullet:
-                break;
+                return null;
 
             case NetEntityType.Asteroid:
-                actor = NetActor.fromEventState(new Asteroid(), event);
+                const asteroid = new Asteroid({ uuid: event.uuid, isReplica: event.isReplica });
+                asteroid.updateState(event.state as any, event.latency);
 
-                break;
+                return asteroid;
         }
 
-        return actor;
+        return null;
     }
 }

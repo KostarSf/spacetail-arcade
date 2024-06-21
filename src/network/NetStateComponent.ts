@@ -7,9 +7,9 @@ export interface NetComponentOptions {
     isReplica?: boolean;
 }
 
-export class NetComponent extends Component {
+export class NetStateComponent extends Component {
     public readonly uuid: string;
-    public isReplica: boolean;
+    public readonly isReplica: boolean;
 
     // Перенести код из NetActor в NetSystem
     // public stale: boolean

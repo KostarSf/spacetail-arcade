@@ -23,7 +23,10 @@ export interface PlayerState {
 }
 
 export interface PlayerOptions {
-    pos: Vector;
+    uuid?: string;
+    isReplica?: boolean;
+
+    pos?: Vector;
 }
 
 export class Player extends NetActor<PlayerState> {
@@ -35,8 +38,11 @@ export class Player extends NetActor<PlayerState> {
 
     constructor(options?: PlayerOptions) {
         super({
-            pos: options?.pos,
             name: "Player",
+            uuid: options?.uuid,
+            isReplica: options?.isReplica,
+
+            pos: options?.pos,
             collider: new PolygonCollider({
                 points: [vec(-10, -10), vec(15, 0), vec(-10, 10)],
             }),
