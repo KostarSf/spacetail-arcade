@@ -1,5 +1,6 @@
 import {
     CollisionType,
+    Color,
     Engine,
     GraphicsGroup,
     PointerButton,
@@ -26,7 +27,9 @@ export interface PlayerOptions {
 }
 
 export class Player extends NetActor<PlayerState> {
-    public type: NetEntityType = NetEntityType.Player;
+    public static readonly Tag = "Player";
+
+    public readonly type: NetEntityType = NetEntityType.Player;
 
     public accelerated = false;
 
@@ -41,12 +44,21 @@ export class Player extends NetActor<PlayerState> {
         });
 
         this.addComponent(new NetBodyComponent({ mass: 10 }));
+        this.addTag(Player.Tag);
     }
 
     onInitialize(engine: Engine<any>): void {
         this.graphics.add(
             new GraphicsGroup({
-                members: [{ graphic: ShadowedSprite.from(Resources.Player), offset: Vector.Zero }],
+                members: [
+                    {
+                        graphic: ShadowedSprite.from(
+                            this.isReplica ? Resources.Pirate : Resources.Player,
+                            this.isReplica ? Color.fromHex("#aaaaaa") : undefined
+                        ),
+                        offset: Vector.Zero,
+                    },
+                ],
             })
         );
 

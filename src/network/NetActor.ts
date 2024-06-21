@@ -1,8 +1,13 @@
 import { Actor, ActorArgs } from "excalibur";
 import { NetComponent } from "./NetComponent";
-import { CreateEntityNetEvent, KillEntityNetEvent, UpdateEntityNetEvent } from "./events";
-import { NetEntityType } from "./types";
 import Network from "./Network";
+import {
+    CreateEntityNetEvent,
+    EntityWithStateNetEvent,
+    KillEntityNetEvent,
+    UpdateEntityNetEvent,
+} from "./events";
+import { NetEntityType } from "./types";
 
 export interface NetActorOptions extends ActorArgs {}
 
@@ -72,14 +77,13 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
         this._dirty = state;
     }
 
-    public static fromState<T extends NetActor>(
-        object: T,
-        uuid: string,
-        state: any,
-        latency: number
-    ) {
-        object.addComponent(new NetComponent({ uuid, isReplica: true }), true);
-        object.updateState(state, latency);
+    public static fromEventState<T extends NetActor>(object: T, event: EntityWithStateNetEvent) {
+        object.addComponent(
+            new NetComponent({ uuid: event.uuid, isReplica: event.isReplica }),
+            true
+        );
+        object.updateState(event.state, event.latency);
+
         return object;
     }
 }

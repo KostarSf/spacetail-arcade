@@ -40,8 +40,8 @@ export class ShadowedSprite extends Sprite {
     public shadowOpacity: number;
     public shadowOrigin: Vector;
 
-    public static from(image: ImageSource): ShadowedSprite {
-        return new ShadowedSprite({ image });
+    public static from(image: ImageSource, tint?: Color): ShadowedSprite {
+        return new ShadowedSprite({ image, tint });
     }
 
     constructor(options: ShadowedSpriteOptions & GraphicOptions & SpriteOptions) {

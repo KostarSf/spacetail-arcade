@@ -13,20 +13,30 @@ import {
 import { NetEntityType } from "~/network/types";
 
 class PlayerConnection {
-    constructor(public socket: WebSocket, public entity: ServerPlayer | null = null) {}
+    public hostEntities: Map<string, ServerEntity>;
+
+    constructor(public socket: WebSocket, public playerEntity: ServerPlayer | null = null) {
+        this.hostEntities = new Map();
+    }
 }
 
 class ServerEntity<TState = {}> {
-    constructor(public uuid: string, public type: NetEntityType, public state: TState) {}
+    constructor(
+        public uuid: string,
+        public type: NetEntityType,
+        public state: TState,
+        public updateTime: number
+    ) {}
 }
 
 class ServerPlayer extends ServerEntity<PlayerState> {
     constructor(
         public connection: PlayerConnection,
-        public uuid: string,
-        public state: PlayerState
+        uuid: string,
+        state: PlayerState,
+        updateTime: number
     ) {
-        super(uuid, NetEntityType.Player, state);
+        super(uuid, NetEntityType.Player, state, updateTime);
     }
 }
 
@@ -43,7 +53,7 @@ export function runGameServer(port?: number) {
 
         const entityEventsList: CreateEntityNetEvent[] = [];
         gameEntities.forEach((entity) => {
-            const entityEvent = new CreateEntityNetEvent({
+            const entityEvent = new UpdateEntityNetEvent({
                 uuid: entity.uuid,
                 entityType: entity.type,
                 state: entity.state,
@@ -82,21 +92,24 @@ export function runGameServer(port?: number) {
                             const playerEntity = new ServerPlayer(
                                 playerConnection,
                                 event.uuid,
-                                (event as CreateEntityNetEvent<PlayerState>).state
+                                (event as CreateEntityNetEvent<PlayerState>).state,
+                                event.time
                             );
 
                             activePlayers.set(event.uuid, playerEntity);
-                            playerConnection.entity = playerEntity;
+                            playerConnection.playerEntity = playerEntity;
 
                             gameEntities.set(event.uuid, playerEntity);
                         } else {
                             const entity = new ServerEntity(
                                 event.uuid,
                                 event.entityType,
-                                (event as CreateEntityNetEvent).state
+                                (event as CreateEntityNetEvent).state,
+                                event.time
                             );
 
                             gameEntities.set(entity.uuid, entity);
+                            playerConnection.hostEntities.set(entity.uuid, entity);
                         }
 
                         break;
@@ -109,9 +122,15 @@ export function runGameServer(port?: number) {
                                 playerEntity = new ServerPlayer(
                                     playerConnection,
                                     event.uuid,
-                                    (event as UpdateEntityNetEvent<PlayerState>).state
+                                    (event as UpdateEntityNetEvent<PlayerState>).state,
+                                    event.time
                                 );
-                                playerConnection.entity = playerEntity;
+                                playerConnection.playerEntity = playerEntity;
+                            } else {
+                                playerEntity.state = (
+                                    event as UpdateEntityNetEvent<PlayerState>
+                                ).state;
+                                playerEntity.updateTime = event.time;
                             }
 
                             activePlayers.set(event.uuid, playerEntity);
@@ -123,11 +142,16 @@ export function runGameServer(port?: number) {
                                 entity = new ServerEntity(
                                     event.uuid,
                                     event.entityType,
-                                    (event as UpdateEntityNetEvent<PlayerState>).state
+                                    (event as UpdateEntityNetEvent).state,
+                                    event.time
                                 );
+                            } else {
+                                entity.state = (event as UpdateEntityNetEvent).state;
+                                entity.updateTime = event.time;
                             }
 
                             gameEntities.set(entity.uuid, entity);
+                            playerConnection.hostEntities.set(entity.uuid, entity);
                         }
 
                         break;
@@ -137,7 +161,9 @@ export function runGameServer(port?: number) {
 
                         if (isPlayerEvent) {
                             activePlayers.delete(event.uuid);
-                            playerConnection.entity = null;
+                            playerConnection.playerEntity = null;
+                        } else {
+                            playerConnection.hostEntities.delete(event.uuid);
                         }
 
                         break;
@@ -152,12 +178,12 @@ export function runGameServer(port?: number) {
         });
 
         ws.on("close", () => {
-            const player = playerConnection.entity;
+            const player = playerConnection.playerEntity;
 
             if (player) {
                 gameEntities.delete(player.uuid);
                 activePlayers.delete(player.uuid);
-                playerConnection.entity = null;
+                playerConnection.playerEntity = null;
 
                 const killEntityEvent = new KillEntityNetEvent({
                     entityType: NetEntityType.Player,
@@ -166,6 +192,39 @@ export function runGameServer(port?: number) {
                 }).serialize();
 
                 server.clients.forEach((socket) => socket.send(killEntityEvent));
+            }
+
+            const orphanEntities = Array.from(playerConnection.hostEntities).map(
+                (entry) => entry[1]
+            );
+            if (orphanEntities.length > 0) {
+                const entitiesPerPlayer = Math.ceil(orphanEntities.length / activePlayers.size);
+
+                activePlayers.forEach((player) => {
+                    const newOwnedEntities = orphanEntities.splice(0, entitiesPerPlayer);
+                    const entitiesListEvent = new EntitiesListEvent({
+                        entities: newOwnedEntities.map(
+                            (entity) =>
+                                new UpdateEntityNetEvent({
+                                    uuid: entity.uuid,
+                                    entityType: entity.type,
+                                    state: entity.state,
+                                    isReplica: false,
+                                    time: entity.updateTime,
+                                })
+                        ),
+                        time: Date.now(),
+                    });
+
+                    newOwnedEntities.forEach((entity) => {
+                        player.connection.hostEntities.set(entity.uuid, entity);
+                    });
+                    player.connection.socket.send(entitiesListEvent.serialize());
+                });
+            }
+
+            if (activePlayers.size === 0) {
+                gameEntities.clear();
             }
 
             console.log(`Client disconnected (${server.clients.size})`);

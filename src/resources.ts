@@ -4,13 +4,13 @@ import bullet from "./images/bullet.png";
 import explosion from "./images/explosion.png";
 import jetstream from "./images/jet_stream.png";
 import logo from "./images/logo.png";
+import pirate from "./images/pirate.png";
 import player from "./images/player.png";
 import space from "./images/space.png";
-import sword from "./images/sword.png";
 
 export const Resources = {
-    Sword: new ImageSource(sword),
     Player: new ImageSource(player),
+    Pirate: new ImageSource(pirate),
     Asteroid: new ImageSource(asteroid),
     Space: new ImageSource(space),
     Bullet: new ImageSource(bullet),

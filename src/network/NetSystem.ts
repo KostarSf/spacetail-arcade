@@ -1,11 +1,11 @@
 import { Query, Scene, System, SystemType, World } from "excalibur";
+import { Player } from "~/actors/Player";
+import { Asteroid } from "~/actors/asteroid";
 import { NetActor } from "./NetActor";
 import { NetComponent } from "./NetComponent";
-import { CreateEntityNetEvent, UpdateEntityNetEvent } from "./events";
-import { NetEntityType } from "./types";
-import { TestPlayer } from "~/actors/TestPlayer";
 import Network from "./Network";
-import { Player } from "~/actors/Player";
+import { EntityWithStateNetEvent } from "./events";
+import { NetEntityType } from "./types";
 
 export class NetSystem extends System {
     systemType: SystemType = SystemType.Update;
@@ -47,7 +47,12 @@ export class NetSystem extends System {
         netState.updateEntityEvents.forEach((event) => {
             const existedActor = this.netActorsMap.get(event.uuid);
             if (existedActor) {
+                existedActor.addComponent(
+                    new NetComponent({ uuid: event.uuid, isReplica: event.isReplica }),
+                    true
+                );
                 existedActor.updateState(event.state, event.latency);
+
                 return;
             }
 
@@ -70,22 +75,22 @@ export class NetSystem extends System {
         });
     }
 
-    public static instantiateNetActor(event: CreateEntityNetEvent | UpdateEntityNetEvent) {
+    public static instantiateNetActor(event: EntityWithStateNetEvent) {
         let actor: NetActor | null = null;
 
         switch (event.entityType as NetEntityType) {
-            case NetEntityType.TestPlayer:
-                actor = NetActor.fromState(
-                    new TestPlayer(),
-                    event.uuid,
-                    event.state,
-                    event.latency
-                );
-                break;
             case NetEntityType.Player:
-                actor = NetActor.fromState(new Player(), event.uuid, event.state, event.latency);
+                actor = NetActor.fromEventState(new Player(), event);
+
+                break;
+
             case NetEntityType.Bullet:
+                break;
+
             case NetEntityType.Asteroid:
+                actor = NetActor.fromEventState(new Asteroid(), event);
+
+                break;
         }
 
         return actor;

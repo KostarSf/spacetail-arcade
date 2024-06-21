@@ -26,11 +26,27 @@ export abstract class NetEvent {
             case NetEventType.ServiceServerPong:
                 return new ServerPongNetEvent(data);
             case NetEventType.ServiceEntitiesList:
+                const batchData = JSON.parse(data.entities) as { type: NetEventType }[];
+                if (batchData.length === 0) {
+                    return null;
+                }
+
+                let batchEvent: typeof CreateEntityNetEvent | typeof UpdateEntityNetEvent | null =
+                    null;
+
+                if (batchData[0].type === NetEventType.EntityCreate) {
+                    batchEvent = CreateEntityNetEvent;
+                }
+                if (batchData[0].type === NetEventType.EntityUpdate) {
+                    batchEvent = UpdateEntityNetEvent;
+                }
+                if (!batchEvent) {
+                    return null;
+                }
+
                 return new EntitiesListEvent({
                     ...data,
-                    entities: (JSON.parse(data.entities) as any[]).map(
-                        (data) => new CreateEntityNetEvent(data)
-                    ),
+                    entities: batchData.map((data: any) => new batchEvent(data)),
                 });
             case NetEventType.EntityCreate:
                 return new CreateEntityNetEvent(data);
@@ -81,9 +97,9 @@ export class ServerPongNetEvent extends NetEvent {
 
 export class EntitiesListEvent extends NetEvent {
     public readonly type: NetEventType = NetEventType.ServiceEntitiesList;
-    public entities: CreateEntityNetEvent[];
+    public entities: EntityWithStateNetEvent[];
 
-    constructor(data: { entities: CreateEntityNetEvent[]; time: number; latency?: number }) {
+    constructor(data: { entities: EntityWithStateNetEvent[]; time: number; latency?: number }) {
         super(data.time, data.latency);
         this.entities = data.entities;
     }
@@ -104,20 +120,31 @@ export abstract class EntityNetEvent extends NetEvent {
     }
 }
 
-export class CreateEntityNetEvent<T extends {} = {}> extends EntityNetEvent {
+export abstract class EntityWithStateNetEvent<T extends {} = {}> extends EntityNetEvent {
+    constructor(
+        uuid: string,
+        entityType: NetEntityType,
+        public state: T,
+        public isReplica = true,
+        latency: number = 0
+    ) {
+        super(uuid, entityType, latency);
+    }
+}
+
+export class CreateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetEvent<T> {
     public readonly type: NetEventType = NetEventType.EntityCreate;
-    public state: T;
 
     constructor(data: {
         uuid: string;
         entityType: NetEntityType;
         state: T;
+        isReplica?: boolean;
         time?: number;
         latency?: number;
     }) {
-        super(data.uuid, data.entityType, data.latency);
+        super(data.uuid, data.entityType, data.state, data.isReplica, data.latency);
         this.time = data.time ?? 0;
-        this.state = data.state;
     }
 
     public serialize(): string {
@@ -128,24 +155,23 @@ export class CreateEntityNetEvent<T extends {} = {}> extends EntityNetEvent {
             uuid: this.uuid,
             entityType: this.entityType,
             state: this.state,
+            isReplica: this.isReplica,
         });
     }
 }
 
-export class UpdateEntityNetEvent<T extends {} = {}> extends EntityNetEvent {
-    public state: T;
-
+export class UpdateEntityNetEvent<T extends {} = {}> extends EntityWithStateNetEvent<T> {
     public readonly type: NetEventType = NetEventType.EntityUpdate;
 
     constructor(data: {
         uuid: string;
         entityType: NetEntityType;
         state: T;
+        isReplica?: boolean;
         time?: number;
         latency?: number;
     }) {
-        super(data.uuid, data.entityType, data.latency);
-        this.state = data.state;
+        super(data.uuid, data.entityType, data.state, data.isReplica, data.latency);
         this.time = data.time ?? 0;
     }
 
@@ -157,6 +183,7 @@ export class UpdateEntityNetEvent<T extends {} = {}> extends EntityNetEvent {
             uuid: this.uuid,
             entityType: this.entityType,
             state: this.state,
+            isReplica: this.isReplica,
         });
     }
 }

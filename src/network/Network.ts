@@ -79,17 +79,35 @@ class Network {
                     const clientTime = Math.round((event.time + this._rawTime) / 2);
                     const serverTime = (event as ServerPongNetEvent).serverTime;
                     this._clockOffset = serverTime - clientTime;
+
                     break;
+
                 case NetEventType.ServiceEntitiesList:
-                    this.createEntityEvents.push(...(event as EntitiesListEvent).entities);
+                    (event as EntitiesListEvent).entities.forEach((event) => {
+                        event.latency = this.time - event.time;
+
+                        if (event.type === NetEventType.EntityCreate) {
+                            this.createEntityEvents.push(event);
+                        } else if (event.type === NetEventType.EntityUpdate) {
+                            this.updateEntityEvents.push(event);
+                        }
+                    });
+
+                    break;
+
                 case NetEventType.EntityCreate:
                     this.createEntityEvents.push(event as CreateEntityNetEvent);
+
                     break;
+
                 case NetEventType.EntityUpdate:
                     this.updateEntityEvents.push(event as UpdateEntityNetEvent);
+
                     break;
+
                 case NetEventType.EntityKill:
                     this.killedEntities.add((event as KillEntityNetEvent).uuid);
+
                     break;
             }
         };
