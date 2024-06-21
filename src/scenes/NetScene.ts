@@ -2,8 +2,10 @@ import { EmitterType, Engine, ParticleEmitter, Scene, TagQuery, Timer, vec } fro
 import { Player } from "~/actors/Player";
 import { Asteroid } from "~/actors/asteroid";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
+import { Decal } from "~/entities/Decal";
 import { NetSystem } from "~/network/NetSystem";
 import Network from "~/network/Network";
+import { Resources } from "~/resources";
 import { UI } from "~/ui/web-ui";
 import { easeOut, lerp, rand } from "~/utils/math";
 
@@ -32,9 +34,10 @@ export class NetScene extends Scene {
         this.player = new Player({
             pos: vec(rand.integer(-150, 150), rand.integer(-150, 150)),
         });
-        this.add(this.player);
 
         this.graphics.initialize(engine);
+
+        this.add(this.player);
 
         const asteroidsSpawnTimer = new Timer({
             random: rand,
@@ -94,6 +97,14 @@ class SpaceGraphics {
     }
 
     initialize(engine: Engine) {
+        const space = new Decal({
+            image: Resources.Space,
+            pos: vec(0, 0),
+            parallax: 0.1,
+            zoomResist: 1.3,
+        });
+        this.scene.add(space);
+
         this.starsParticles = new ParticleEmitter({
             emitterType: EmitterType.Rectangle,
             width: engine.drawWidth * 2,

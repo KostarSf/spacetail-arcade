@@ -13,9 +13,9 @@ export interface DecalOptions {
     image: ImageSource;
     pos: Vector;
     parallax?: Vector | number;
-
     /** `[0.0 - 2.0]`. 0 - отдаляется при отдалении камеры. 1 - сохраняет относительный масштаб. 2 - приближается при отдалении камеры */
     zoomResist?: number;
+    z?: number;
 }
 
 export class Decal extends Entity {
@@ -25,6 +25,7 @@ export class Decal extends Entity {
     constructor(options: DecalOptions) {
         const transform = new TransformComponent();
         transform.pos = options.pos;
+        transform.z = options.z ?? transform.z;
 
         const graphics = new GraphicsComponent();
 
