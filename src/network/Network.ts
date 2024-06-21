@@ -18,7 +18,9 @@ export interface NetworkStateSlice {
 
 class Network {
     private host: string;
-    private socket: WebSocket;
+    private socket: WebSocket | null;
+    private scheduledEvents: Map<NetEvent, string>;
+    private reconnectInterval?: NodeJS.Timeout;
 
     private createEntityEvents: CreateEntityNetEvent[];
     private updateEntityEvents: UpdateEntityNetEvent[];
@@ -52,17 +54,27 @@ class Network {
         this.killedEntities = new Set();
 
         this.host = host;
-        this.socket = this.connect();
+        this.socket = null;
+        this.scheduledEvents = new Map();
 
         setInterval(() => {
-            this.sendEvent(new ClientPingNetEvent({ time: this._rawTime }));
+            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                this.sendEvent(new ClientPingNetEvent({ time: this._rawTime }));
+            }
         }, 500);
     }
 
-    private connect() {
+    private _connect() {
         const socket = new WebSocket(this.host);
 
-        socket.onmessage = async (message: MessageEvent<Blob | string>) => {
+        socket.addEventListener("open", () => {
+            this.scheduledEvents.forEach((message) => {
+                socket.send(message);
+            });
+            this.scheduledEvents.clear();
+        });
+
+        socket.addEventListener("message", async (message: MessageEvent<Blob | string>) => {
             const data =
                 typeof message.data === "string" ? message.data : await message.data.text();
             const event = NetEvent.parse(data);
@@ -70,8 +82,6 @@ class Network {
             if (!event) {
                 return;
             }
-
-            event.latency = this.time - event.time;
 
             switch (event.type) {
                 case NetEventType.ServiceServerPong:
@@ -110,33 +120,53 @@ class Network {
 
                     break;
             }
-        };
+        });
 
-        socket.onclose = () => {
-            setTimeout(() => {
-                this.socket = this.connect();
-            });
-        };
+        socket.addEventListener("close", () => {
+            this.socket = null;
+
+            clearTimeout(this.reconnectInterval);
+            this.reconnectInterval = setTimeout(() => {
+                this.socket = this._connect();
+            }, 1000);
+        });
 
         return socket;
     }
 
     public sendEvent(event: NetEvent) {
-        if (this.socket.readyState !== WebSocket.OPEN) {
-            return;
-        }
-
         if (event.type !== NetEventType.ServiceClientPing) {
             event.time = this.time;
         }
 
         if (this.simulatedLatency > 0) {
             setTimeout(() => {
-                this.socket.send(event.serialize());
+                this._send(event);
             }, this.simulatedLatency);
         } else {
-            this.socket.send(event.serialize());
+            this._send(event);
         }
+    }
+
+    private _send(event: NetEvent) {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            this.scheduledEvents.set(event, event.serialize());
+            return;
+        }
+
+        this.socket.send(event.serialize());
+    }
+
+    public connect(): Promise<void> {
+        return new Promise((res, rej) => {
+            this.socket = this._connect();
+            this.socket.addEventListener("open", () => {
+                res();
+            });
+            this.socket.addEventListener("error", () => {
+                rej();
+            });
+        });
     }
 
     public sliceState(): NetworkStateSlice {

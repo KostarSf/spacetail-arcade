@@ -57,6 +57,7 @@ export function runGameServer(port?: number) {
                 uuid: entity.uuid,
                 entityType: entity.type,
                 state: entity.state,
+                time: entity.updateTime,
             });
             entityEventsList.push(entityEvent);
         });

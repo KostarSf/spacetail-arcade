@@ -28,7 +28,7 @@ export class NetScene extends Scene {
         this.playersQuery = this.world.queryTags([Player.Tag]);
         this.asteroidsQuery = this.world.queryTags([Asteroid.Tag]);
 
-        this.world.add(new NetSystem(this.world, this));
+        this.world.add(new NetSystem(this));
         this.world.add(NetPhysicsSystem);
 
         const playerPosLimit = 100;
@@ -45,8 +45,8 @@ export class NetScene extends Scene {
 
         const asteroidsSpawnTimer = new Timer({
             random: rand,
-            randomRange: [0, 10_000],
-            interval: 100,
+            randomRange: [0, 500],
+            interval: 0,
             repeats: true,
             fcn: () => this.trySpawnAsteroids(),
         });
@@ -55,7 +55,7 @@ export class NetScene extends Scene {
     }
 
     private trySpawnAsteroids() {
-        const maxAsteroidsCount = 200;
+        const maxAsteroidsCount = 5;
 
         if (this.asteroidsQuery.entities.length >= maxAsteroidsCount) {
             return;
@@ -66,8 +66,8 @@ export class NetScene extends Scene {
             return;
         }
 
-        const posLimit = 1500;
-        const velLimit = 100;
+        const posLimit = 20;
+        const velLimit = 0;
 
         const asteroid = new Asteroid({
             pos: vec(rand.floating(-posLimit, posLimit), rand.floating(-posLimit, posLimit)),

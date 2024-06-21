@@ -1,4 +1,4 @@
-import { CollisionType, Color, Engine, Vector } from "excalibur";
+import { CollisionType, Color, Engine, TwoPI, Vector } from "excalibur";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
@@ -96,7 +96,8 @@ export class Asteroid extends NetActor<AsteroidState> {
 
         const delta = latency / 1000;
 
-        this.rotation += this.angularVelocity * delta;
+        const newRotation = (this.angularVelocity * delta) % TwoPI;
+        this.rotation += newRotation + (newRotation < 0 ? TwoPI : 0);
         this.pos.addEqual(this.vel.scale(delta));
         this.netBody.mass = state.mass;
     }

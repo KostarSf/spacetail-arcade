@@ -1,4 +1,4 @@
-import { Query, Scene, System, SystemType, World } from "excalibur";
+import { Scene, System, SystemType } from "excalibur";
 import { Player } from "~/actors/Player";
 import { Asteroid } from "~/actors/asteroid";
 import { NetActor } from "./NetActor";
@@ -10,31 +10,27 @@ import { NetEntityType } from "./types";
 export class NetSystem extends System {
     systemType: SystemType = SystemType.Update;
 
-    private query: Query<typeof NetComponent>;
     private netActorsMap: Map<string, NetActor>;
-
     private scene: Scene;
 
-    constructor(world: World, scene: Scene) {
+    constructor(scene: Scene) {
         super();
-        this.query = world.query([NetComponent]);
-        this.netActorsMap = new Map();
 
+        this.netActorsMap = new Map();
         this.scene = scene;
     }
 
     update(_elapsedMs: number): void {
-
         const netState = Network.sliceState();
 
-        const actors = this.query.entities as NetActor[];
-        for (let i = 0; i < actors.length; i++) {
-            const actor = actors[i];
-            if (netState.killedEntities.has(actor.uuid)) {
-                this.netActorsMap.delete(actor.uuid);
+        netState.killedEntities.forEach((uuid) => {
+            const actor = this.netActorsMap.get(uuid);
+
+            if (actor) {
+                this.netActorsMap.delete(uuid);
                 actor.kill();
             }
-        }
+        });
 
         netState.updateEntityEvents.forEach((event) => {
             const existedActor = this.netActorsMap.get(event.uuid);
