@@ -78,10 +78,7 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
     }
 
     public static fromEventState<T extends NetActor>(object: T, event: EntityWithStateNetEvent) {
-        object.addComponent(
-            new NetComponent({ uuid: event.uuid, isReplica: event.isReplica }),
-            true
-        );
+        object.get(NetComponent).isReplica = event.isReplica;
         object.updateState(event.state, event.latency);
 
         return object;

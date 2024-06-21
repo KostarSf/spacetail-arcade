@@ -31,8 +31,12 @@ export class NetScene extends Scene {
         this.world.add(new NetSystem(this.world, this));
         this.world.add(NetPhysicsSystem);
 
+        const playerPosLimit = 100;
         this.player = new Player({
-            pos: vec(rand.integer(-150, 150), rand.integer(-150, 150)),
+            pos: vec(
+                rand.integer(-playerPosLimit, playerPosLimit),
+                rand.integer(-playerPosLimit, playerPosLimit)
+            ),
         });
 
         this.graphics.initialize(engine);

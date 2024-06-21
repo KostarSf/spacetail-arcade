@@ -9,7 +9,7 @@ export interface NetComponentOptions {
 
 export class NetComponent extends Component {
     public readonly uuid: string;
-    public readonly isReplica: boolean;
+    public isReplica: boolean;
 
     // Перенести код из NetActor в NetSystem
     // public stale: boolean
