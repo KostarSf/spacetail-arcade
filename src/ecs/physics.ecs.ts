@@ -4,7 +4,6 @@ import {
     ColliderComponent,
     CollisionType,
     Component,
-    Entity,
     MotionComponent,
     PreCollisionEvent,
     Query,
@@ -16,7 +15,8 @@ import {
     World,
 } from "excalibur";
 import { Explosion } from "~/entities/Explosion";
-import { NetComponent } from "~/network/NetComponent";
+import { NetActor } from "~/network/NetActor";
+import { NetStateComponent } from "~/network/NetStateComponent";
 import { HealthComponent } from "./health.ecs";
 
 export interface NetBodyOptions {
@@ -36,7 +36,7 @@ export class NetBodyComponent extends Component {
         return this.owner?.get(MotionComponent).vel!;
     }
 
-    readonly dependencies = [MotionComponent, BodyComponent, ColliderComponent, NetComponent];
+    readonly dependencies = [MotionComponent, BodyComponent, ColliderComponent, NetStateComponent];
 
     constructor(options: NetBodyOptions) {
         super();
@@ -44,11 +44,7 @@ export class NetBodyComponent extends Component {
         this.mass = options.mass;
     }
 
-    onAdd(
-        owner: Entity<
-            BodyComponent | ColliderComponent | TransformComponent | NetBodyComponent | NetComponent
-        >
-    ): void {
+    onAdd(owner: NetActor): void {
         owner.get(BodyComponent).collisionType = CollisionType.Passive;
 
         owner.get(ColliderComponent).events.on("precollision", (evt: any) => {
@@ -103,7 +99,7 @@ export class NetBodyComponent extends Component {
                 motion.vel.addEqual(
                     evt.damager.vel.normalize().scale((evt.amount * 5) / body.mass)
                 );
-                owner.get(NetComponent).actor.markStale();
+                owner.markStale();
             });
         });
     }
@@ -114,10 +110,7 @@ export class NetPhysicsSystem extends System {
     public priority: number = SystemPriority.Average;
 
     private query: Query<
-        | typeof NetComponent
-        | typeof NetBodyComponent
-        | typeof MotionComponent
-        | typeof TransformComponent
+        typeof NetBodyComponent | typeof MotionComponent | typeof TransformComponent
     >;
 
     constructor(world: World) {
@@ -128,18 +121,16 @@ export class NetPhysicsSystem extends System {
     update(_elapsedMs: number): void {
         let body: NetBodyComponent;
         let motion: MotionComponent;
-        let net: NetComponent;
 
-        const entities = this.query.entities;
+        const entities = this.query.entities as NetActor[];
         for (let i = 0; i < entities.length; i++) {
             body = entities[i].get(NetBodyComponent);
             motion = entities[i].get(MotionComponent);
-            net = entities[i].get(NetComponent);
 
             if (body.nextVel !== null) {
                 motion.vel = body.nextVel;
                 body.nextVel = null;
-                net.actor.markStale();
+                entities[i].markStale();
             }
         }
     }
