@@ -2,18 +2,26 @@ import { Animation, AnimationStrategy, ImageSource, Loader, SpriteSheet, range }
 import asteroid from "./images/asteroid.png";
 import bullet from "./images/bullet.png";
 import explosion from "./images/explosion.png";
-import jetstream from "./images/jet_stream.png";
+import jetstream from "./images/jetstream.png";
 import logo from "./images/logo.png";
+import pirateDamaged from "./images/pirate-damaged.png";
 import pirate from "./images/pirate.png";
+import playerDamaged from "./images/player-broken.png";
 import player from "./images/player.png";
 import space from "./images/space.png";
 
 export const Resources = {
     Player: new ImageSource(player),
+    PlayerDamaged: new ImageSource(playerDamaged),
+
     Pirate: new ImageSource(pirate),
+    PirateDamaged: new ImageSource(pirateDamaged),
+
     Asteroid: new ImageSource(asteroid),
-    Space: new ImageSource(space),
     Bullet: new ImageSource(bullet),
+
+    Space: new ImageSource(space),
+
     Explosion: new ImageSource(explosion),
     JetStream: new ImageSource(jetstream),
 } as const;
@@ -71,4 +79,4 @@ loader.playButtonText = "Play";
 loader.logo = logo;
 loader.logoWidth = 256;
 loader.logoHeight = 128;
-loader.suppressPlayButton = true;
+loader.suppressPlayButton = false;
