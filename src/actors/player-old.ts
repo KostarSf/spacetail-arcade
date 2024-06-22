@@ -1,7 +1,7 @@
 import { Color, Engine, Keys, PointerButton } from "excalibur";
 import { netClient } from "../network/NetClient";
 import { easeOut, lerp, linInt, round, vecToArray } from "../utils/math";
-import { Bullet } from "./bullet";
+import { Bullet } from "./Bullet";
 import { Ship, ShipOptions } from "./ship";
 
 export class Player extends Ship {

@@ -26,8 +26,8 @@ import {
 } from "excalibur";
 import { ShipComponent } from "~/ecs/ship";
 import { ShipSystem } from "~/ecs/ship/ShipSystem";
-import { Asteroid, AsteroidOptions } from "../actors/asteroid";
-import { Bullet } from "../actors/bullet";
+import { Asteroid, AsteroidOptions } from "../actors/Asteroid";
+import { Bullet } from "../actors/Bullet";
 import { Player } from "../actors/player";
 import { Ship } from "../actors/ship";
 import { UuidComponent } from "../ecs/UuidComponent";

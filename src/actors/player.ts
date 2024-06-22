@@ -11,13 +11,14 @@ import {
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
-import { ActionEvent } from "~/network/events";
-import { ActionEventType, NetEntityType, SerializedVector } from "~/network/types";
+import { NetAction } from "~/network/events/actions/NetAction";
+import { ActionType, SerializableObject } from "~/network/events/types";
+import { ActorType, SerializedVector } from "~/network/types";
 import { Resources } from "~/resources";
 import { round, vecToArray } from "~/utils/math";
-import { Bullet } from "./bullet";
+import { Bullet } from "./Bullet";
 
-export interface PlayerState {
+export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
     vel: SerializedVector;
     accelerated: boolean;
@@ -34,7 +35,7 @@ export interface PlayerOptions {
 export class Player extends NetActor<PlayerState> {
     public static readonly Tag = "Player";
 
-    public readonly type: NetEntityType = NetEntityType.Player;
+    public readonly type: ActorType = ActorType.Player;
 
     public accelerated = false;
 
@@ -159,9 +160,9 @@ export class Player extends NetActor<PlayerState> {
         this.vel = newVel;
     }
 
-    protected receiveAction(action: ActionEvent, _latency: number): void {
+    protected receiveAction(action: NetAction, _latency: number): void {
         switch (action.type) {
-            case ActionEventType.Damage:
+            case ActionType.Damage:
                 this.kill();
         }
     }

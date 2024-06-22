@@ -1,28 +1,27 @@
 import { Actor, ActorArgs } from "excalibur";
 import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
-import {
-    ActionEvent,
-    CreateEntityNetEvent,
-    EntityActionNetEvent,
-    KillEntityNetEvent,
-    UpdateEntityNetEvent,
-} from "./events";
-import { NetEntityType } from "./types";
+import { NetAction } from "./events/actions/NetAction";
+import { EntityActionEvent } from "./events/EntityActionEvent";
+import { KillEntityEvent } from "./events/KillEntityEvent";
+import { UpdateEntityEvent } from "./events/UpdateEntityEvent";
+import { CreateEntityEvent } from "./events/CreateEntityEvent";
+import { ActorType } from "./types";
+import { SerializableObject } from "./events/types";
 
 export interface NetActorOptions extends ActorArgs {
     uuid?: string;
     isReplica?: boolean;
 }
 
-export abstract class NetActor<NetState extends {} = {}> extends Actor {
+export abstract class NetActor<NetState extends SerializableObject = {}> extends Actor {
     private _dirty: boolean = false;
 
     get isStale() {
         return this._dirty;
     }
 
-    public abstract readonly type: NetEntityType;
+    public abstract readonly type: ActorType;
 
     constructor(options: NetActorOptions = {}) {
         super(options);
@@ -33,7 +32,7 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
         this.on("initialize", () => {
             if (!this.isReplica) {
                 Network.sendEvent(
-                    new CreateEntityNetEvent({
+                    new CreateEntityEvent({
                         uuid: this.uuid,
                         entityType: this.type,
                         state: this.serializeState(),
@@ -45,7 +44,7 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
         this.on("preupdate", () => {
             if (!this.isReplica && this.isStale) {
                 Network.sendEvent(
-                    new UpdateEntityNetEvent({
+                    new UpdateEntityEvent({
                         uuid: this.uuid,
                         entityType: this.type,
                         state: this.serializeState(),
@@ -59,7 +58,7 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
         this.on("kill", () => {
             if (!this.isReplica) {
                 Network.sendEvent(
-                    new KillEntityNetEvent({
+                    new KillEntityEvent({
                         uuid: this.uuid,
                         entityType: this.type,
                     })
@@ -87,12 +86,12 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
         this._dirty = state;
     }
 
-    public sendAction(action: ActionEvent) {
+    public sendAction(action: NetAction) {
         if (!this.isReplica) {
             this.receiveAction(action, 0);
         }
 
-        const entityActionEvent = new EntityActionNetEvent({
+        const entityActionEvent = new EntityActionEvent({
             uuid: this.uuid,
             entityType: this.type,
             action,
@@ -101,9 +100,9 @@ export abstract class NetActor<NetState extends {} = {}> extends Actor {
     }
 
     /** @internal */
-    public _receiveAction(action: ActionEvent, latency: number): void {
+    public _receiveAction(action: NetAction, latency: number): void {
         this.receiveAction(action, latency);
     }
 
-    protected receiveAction(_action: ActionEvent, _latency: number): void {}
+    protected receiveAction(_action: NetAction, _latency: number): void {}
 }

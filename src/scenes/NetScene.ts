@@ -1,6 +1,6 @@
 import { EmitterType, Engine, ParticleEmitter, Scene, TagQuery, Timer, vec } from "excalibur";
+import { Asteroid } from "~/actors/Asteroid";
 import { Player } from "~/actors/Player";
-import { Asteroid } from "~/actors/asteroid";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
 import { Decal } from "~/entities/Decal";
 import { NetSystem } from "~/network/NetSystem";
@@ -28,7 +28,7 @@ export class NetScene extends Scene {
         this.playersQuery = this.world.queryTags([Player.Tag]);
         this.asteroidsQuery = this.world.queryTags([Asteroid.Tag]);
 
-        this.world.add(new NetSystem(this));
+        this.world.add(NetSystem);
         this.world.add(NetPhysicsSystem);
 
         const playerPosLimit = 100;
@@ -45,8 +45,8 @@ export class NetScene extends Scene {
 
         const asteroidsSpawnTimer = new Timer({
             random: rand,
-            randomRange: [0, 500],
-            interval: 0,
+            randomRange: [0, 1500],
+            interval: 500,
             repeats: true,
             fcn: () => this.trySpawnAsteroids(),
         });
@@ -55,7 +55,7 @@ export class NetScene extends Scene {
     }
 
     private trySpawnAsteroids() {
-        const maxAsteroidsCount = 4;
+        const maxAsteroidsCount = 5;
 
         if (this.asteroidsQuery.entities.length >= maxAsteroidsCount) {
             return;
@@ -66,8 +66,8 @@ export class NetScene extends Scene {
             return;
         }
 
-        const posLimit = 150;
-        const velLimit = 0;
+        const posLimit = 300;
+        const velLimit = 10;
 
         const asteroid = new Asteroid({
             pos: vec(rand.floating(-posLimit, posLimit), rand.floating(-posLimit, posLimit)),

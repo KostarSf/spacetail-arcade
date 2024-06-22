@@ -1,12 +1,12 @@
 import { Query, Scene, System, SystemType, World } from "excalibur";
+import { Asteroid } from "~/actors/Asteroid";
+import { Bullet } from "~/actors/Bullet";
 import { Player } from "~/actors/Player";
-import { Asteroid } from "~/actors/asteroid";
-import { Bullet } from "~/actors/bullet";
 import { NetActor } from "./NetActor";
 import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
-import { EntityWithStateNetEvent } from "./events";
-import { NetEntityType } from "./types";
+import { EntityWithStateEvent } from "./events/EntityWithStateEvent";
+import { ActorType } from "./types";
 
 export class NetSystem extends System {
     systemType: SystemType = SystemType.Update;
@@ -46,7 +46,7 @@ export class NetSystem extends System {
                 existedActor.kill();
             }
 
-            const newActor = this.instantiateNetActor(event);
+            const newActor = NetSystem.instantiateActor(event, this.netActors);
             if (newActor) {
                 this.netActors.set(event.uuid, newActor);
                 this.scene.add(newActor);
@@ -57,7 +57,7 @@ export class NetSystem extends System {
             const actor = this.netActors.get(event.uuid);
 
             if (!actor) {
-                const newActor = this.instantiateNetActor(event);
+                const newActor = NetSystem.instantiateActor(event, this.netActors);
                 if (newActor) {
                     this.netActors.set(event.uuid, newActor);
                     this.scene.add(newActor);
@@ -97,27 +97,32 @@ export class NetSystem extends System {
         });
     }
 
-    private instantiateNetActor(event: EntityWithStateNetEvent): NetActor | null {
-        switch (event.entityType as NetEntityType) {
-            case NetEntityType.Player:
-                const player = new Player({ uuid: event.uuid, isReplica: event.isReplica });
-                player.updateState(event.state as any, event.latency);
+    private static actorsRegistry: Map<
+        ActorType,
+        new (data: { uuid?: string; isReplica?: boolean }) => NetActor
+    > = new Map();
 
-                return player;
+    public static registerActor(
+        type: ActorType,
+        ctor: new (data: { uuid?: string; isReplica?: boolean }) => NetActor
+    ) {
+        this.actorsRegistry.set(type, ctor);
+    }
 
-            case NetEntityType.Bullet:
-                const bullet = new Bullet({ uuid: event.uuid, isReplica: event.isReplica });
-                bullet.updateState(event.state as any, event.latency, this.netActors);
-
-                return bullet;
-
-            case NetEntityType.Asteroid:
-                const asteroid = new Asteroid({ uuid: event.uuid, isReplica: event.isReplica });
-                asteroid.updateState(event.state as any, event.latency);
-
-                return asteroid;
+    private static instantiateActor(event: EntityWithStateEvent, netActors: Map<string, NetActor>) {
+        const ctor = this.actorsRegistry.get(event.entityType);
+        if (!ctor) {
+            console.error(`Unknown actor type: ${event.entityType}`);
+            return null;
         }
 
-        return null;
+        const actor = new ctor({ uuid: event.uuid, isReplica: event.isReplica });
+        actor.updateState(event.state, event.latency, netActors);
+
+        return actor;
     }
 }
+
+NetSystem.registerActor(ActorType.Player, Player);
+NetSystem.registerActor(ActorType.Asteroid, Asteroid);
+NetSystem.registerActor(ActorType.Bullet, Bullet);

@@ -1,22 +1,20 @@
 import { rand } from "~/utils/math";
-import {
-    ClientPingNetEvent,
-    CreateEntityNetEvent,
-    EntitiesListEvent,
-    EntityActionNetEvent,
-    KillEntityNetEvent,
-    NetEvent,
-    ServerPongNetEvent,
-    UpdateEntityNetEvent,
-} from "./events";
-import { NetEventType } from "./types";
+import { ClientPingEvent } from "./events/ClientPingEvent";
+import { CreateEntityEvent } from "./events/CreateEntityEvent";
+import { EntitiesListEvent } from "./events/EntitiesListEvent";
+import { EntityActionEvent } from "./events/EntityActionEvent";
+import { KillEntityEvent } from "./events/KillEntityEvent";
+import { NetEvent } from "./events/NetEvent";
+import { ServerPongEvent } from "./events/ServerPongEvent";
+import { UpdateEntityEvent } from "./events/UpdateEntityEvent";
+import { EventType } from "./events/types";
 
 export interface NetworkStateSlice {
-    createEntityEvents: CreateEntityNetEvent[];
-    updateEntityEvents: UpdateEntityNetEvent[];
+    createEntityEvents: CreateEntityEvent[];
+    updateEntityEvents: UpdateEntityEvent[];
     killedEntities: Set<string>;
 
-    entityActionsEvents: EntityActionNetEvent[];
+    entityActionsEvents: EntityActionEvent[];
 }
 
 class Network {
@@ -25,12 +23,12 @@ class Network {
     private scheduledEvents: Map<NetEvent, string>;
     private reconnectInterval?: NodeJS.Timeout;
 
-    private createEntityEvents: CreateEntityNetEvent[];
-    private updateEntityEvents: UpdateEntityNetEvent[];
+    private createEntityEvents: CreateEntityEvent[];
+    private updateEntityEvents: UpdateEntityEvent[];
     private killedEntities: Set<string>;
-    private entityActionsEvents: EntityActionNetEvent[];
+    private entityActionsEvents: EntityActionEvent[];
 
-    private simulatedLatency = rand.integer(0, 30);
+    private simulatedLatency = rand.integer(0, 50);
     private simulatedClockDrift = rand.integer(-300, 300);
 
     private _ping = 0;
@@ -64,7 +62,7 @@ class Network {
 
         setInterval(() => {
             if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                this.sendEvent(new ClientPingNetEvent({ time: this._rawTime }));
+                this.sendEvent(new ClientPingEvent({ time: this._rawTime }));
             }
         }, 500);
     }
@@ -88,45 +86,47 @@ class Network {
                 return;
             }
 
+            event.latency = this.time - event.time;
+
             switch (event.type) {
-                case NetEventType.ServiceServerPong:
+                case EventType.ServiceServerPong:
                     this._ping = Math.round((this._rawTime - event.time) / 2);
                     const clientTime = Math.round((event.time + this._rawTime) / 2);
-                    const serverTime = (event as ServerPongNetEvent).serverTime;
+                    const serverTime = (event as unknown as ServerPongEvent).serverTime;
                     this._clockOffset = serverTime - clientTime;
 
                     break;
 
-                case NetEventType.ServiceEntitiesList:
-                    (event as EntitiesListEvent).entities.forEach((event) => {
+                case EventType.ServiceEntitiesList:
+                    (event as unknown as EntitiesListEvent).entities.forEach((event) => {
                         event.latency = this.time - event.time;
 
-                        if (event.type === NetEventType.EntityCreate) {
-                            this.createEntityEvents.push(event);
-                        } else if (event.type === NetEventType.EntityUpdate) {
-                            this.updateEntityEvents.push(event);
+                        if (event.type === EventType.EntityCreate) {
+                            this.createEntityEvents.push(event as any);
+                        } else if (event.type === EventType.EntityUpdate) {
+                            this.updateEntityEvents.push(event as any);
                         }
                     });
 
                     break;
 
-                case NetEventType.EntityCreate:
-                    this.createEntityEvents.push(event as CreateEntityNetEvent);
+                case EventType.EntityCreate:
+                    this.createEntityEvents.push(event as any);
 
                     break;
 
-                case NetEventType.EntityUpdate:
-                    this.updateEntityEvents.push(event as UpdateEntityNetEvent);
+                case EventType.EntityUpdate:
+                    this.updateEntityEvents.push(event as any);
 
                     break;
 
-                case NetEventType.EntityKill:
-                    this.killedEntities.add((event as KillEntityNetEvent).uuid);
+                case EventType.EntityKill:
+                    this.killedEntities.add((event as unknown as KillEntityEvent).uuid);
 
                     break;
 
-                case NetEventType.EntityAction:
-                    this.entityActionsEvents.push(event as EntityActionNetEvent);
+                case EventType.EntityAction:
+                    this.entityActionsEvents.push(event as any);
 
                     break;
             }
@@ -145,7 +145,7 @@ class Network {
     }
 
     public sendEvent(event: NetEvent) {
-        if (event.type !== NetEventType.ServiceClientPing) {
+        if (event.type !== EventType.ServiceClientPing) {
             event.time = this.time;
         }
 
@@ -159,12 +159,14 @@ class Network {
     }
 
     private _send(event: NetEvent) {
+        const message = event.serialize();
+
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-            this.scheduledEvents.set(event, event.serialize());
+            this.scheduledEvents.set(event, message);
             return;
         }
 
-        this.socket.send(event.serialize());
+        this.socket.send(message);
     }
 
     public connect(): Promise<void> {

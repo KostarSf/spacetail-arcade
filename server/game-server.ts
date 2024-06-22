@@ -1,15 +1,16 @@
 import { WebSocket, WebSocketServer } from "ws";
 import { PlayerState } from "~/actors/Player";
-import {
-    CreateEntityNetEvent,
-    EntitiesListEvent,
-    EntityNetEvent,
-    KillEntityNetEvent,
-    NetEvent,
-    ServerPongNetEvent,
-    UpdateEntityNetEvent,
-} from "~/network/events";
-import { NetEntityType, NetEventType, NetReceiverType } from "~/network/types";
+import { CreateEntityEvent } from "~/network/events/CreateEntityEvent";
+import { EntitiesListEvent } from "~/network/events/EntitiesListEvent";
+import { EntityEvent } from "~/network/events/EntityEvent";
+import { EntityWithStateEvent } from "~/network/events/EntityWithStateEvent";
+import { KillEntityEvent } from "~/network/events/KillEntityEvent";
+import { NetEvent } from "~/network/events/NetEvent";
+import { ServerPongEvent } from "~/network/events/ServerPongEvent";
+import { UpdateEntityEvent } from "~/network/events/UpdateEntityEvent";
+import { registerNetEvents } from "~/network/events/registry";
+import { EventType, ReceiverType } from "~/network/events/types";
+import { ActorType } from "~/network/types";
 
 class PlayerConnection {
     public hostEntities: Map<string, ServerEntity>;
@@ -22,7 +23,7 @@ class PlayerConnection {
 class ServerEntity<TState = {}> {
     constructor(
         public uuid: string,
-        public type: NetEntityType,
+        public type: ActorType,
         public state: TState,
         public updateTime: number
     ) {}
@@ -35,7 +36,7 @@ class ServerPlayer extends ServerEntity<PlayerState> {
         state: PlayerState,
         updateTime: number
     ) {
-        super(uuid, NetEntityType.Player, state, updateTime);
+        super(uuid, ActorType.Player, state, updateTime);
     }
 }
 
@@ -43,6 +44,8 @@ const activePlayers = new Map<string, ServerPlayer>();
 const gameEntities = new Map<string, ServerEntity>();
 
 export function runGameServer(port?: number) {
+    registerNetEvents();
+
     const server = new WebSocketServer({ port: port ?? 8080 });
 
     server.on("connection", (ws) => {
@@ -50,9 +53,9 @@ export function runGameServer(port?: number) {
 
         const playerConnection = new PlayerConnection(ws);
 
-        const entityEventsList: CreateEntityNetEvent[] = [];
+        const entityEventsList: EntityWithStateEvent[] = [];
         gameEntities.forEach((entity) => {
-            const entityEvent = new UpdateEntityNetEvent({
+            const entityEvent = new UpdateEntityEvent({
                 uuid: entity.uuid,
                 entityType: entity.type,
                 state: entity.state,
@@ -72,9 +75,9 @@ export function runGameServer(port?: number) {
                 return;
             }
 
-            if (event.type === NetEventType.ServiceClientPing) {
+            if (event.type === EventType.ServiceClientPing) {
                 ws.send(
-                    new ServerPongNetEvent({
+                    new ServerPongEvent({
                         time: event.time,
                         serverTime: Date.now(),
                         latency: event.latency,
@@ -83,16 +86,16 @@ export function runGameServer(port?: number) {
                 return;
             }
 
-            if (event instanceof EntityNetEvent) {
-                const isPlayerEvent = event.entityType === NetEntityType.Player;
+            if (event instanceof EntityEvent) {
+                const isPlayerEvent = event.entityType === ActorType.Player;
 
                 switch (event.type) {
-                    case NetEventType.EntityCreate:
+                    case EventType.EntityCreate:
                         if (isPlayerEvent) {
                             const playerEntity = new ServerPlayer(
                                 playerConnection,
                                 event.uuid,
-                                (event as CreateEntityNetEvent<PlayerState>).state,
+                                (event as CreateEntityEvent<PlayerState>).state,
                                 event.time
                             );
 
@@ -104,7 +107,7 @@ export function runGameServer(port?: number) {
                             const entity = new ServerEntity(
                                 event.uuid,
                                 event.entityType,
-                                (event as CreateEntityNetEvent).state,
+                                (event as CreateEntityEvent).state,
                                 event.time
                             );
 
@@ -114,7 +117,7 @@ export function runGameServer(port?: number) {
 
                         break;
 
-                    case NetEventType.EntityUpdate:
+                    case EventType.EntityUpdate:
                         if (isPlayerEvent) {
                             let playerEntity = activePlayers.get(event.uuid);
 
@@ -122,13 +125,13 @@ export function runGameServer(port?: number) {
                                 playerEntity = new ServerPlayer(
                                     playerConnection,
                                     event.uuid,
-                                    (event as UpdateEntityNetEvent<PlayerState>).state,
+                                    (event as UpdateEntityEvent<PlayerState>).state,
                                     event.time
                                 );
                                 playerConnection.playerEntity = playerEntity;
                             } else {
                                 playerEntity.state = (
-                                    event as UpdateEntityNetEvent<PlayerState>
+                                    event as UpdateEntityEvent<PlayerState>
                                 ).state;
                                 playerEntity.updateTime = event.time;
                             }
@@ -142,11 +145,11 @@ export function runGameServer(port?: number) {
                                 entity = new ServerEntity(
                                     event.uuid,
                                     event.entityType,
-                                    (event as UpdateEntityNetEvent).state,
+                                    (event as UpdateEntityEvent).state,
                                     event.time
                                 );
                             } else {
-                                entity.state = (event as UpdateEntityNetEvent).state;
+                                entity.state = (event as UpdateEntityEvent).state;
                                 entity.updateTime = event.time;
                             }
 
@@ -156,7 +159,7 @@ export function runGameServer(port?: number) {
 
                         break;
 
-                    case NetEventType.EntityKill:
+                    case EventType.EntityKill:
                         gameEntities.delete(event.uuid);
 
                         if (isPlayerEvent) {
@@ -171,7 +174,7 @@ export function runGameServer(port?: number) {
             }
 
             server.clients.forEach((socket) => {
-                if (socket !== ws || event.receiver === NetReceiverType.AllClients) {
+                if (socket !== ws || event.receiver === ReceiverType.AllClients) {
                     socket.send(event.serialize());
                 }
             });
@@ -185,8 +188,8 @@ export function runGameServer(port?: number) {
                 activePlayers.delete(player.uuid);
                 playerConnection.playerEntity = null;
 
-                const killEntityEvent = new KillEntityNetEvent({
-                    entityType: NetEntityType.Player,
+                const killEntityEvent = new KillEntityEvent({
+                    entityType: ActorType.Player,
                     uuid: player.uuid,
                     time: Date.now(),
                 }).serialize();
@@ -205,7 +208,7 @@ export function runGameServer(port?: number) {
                     const entitiesListEvent = new EntitiesListEvent({
                         entities: newOwnedEntities.map(
                             (entity) =>
-                                new UpdateEntityNetEvent({
+                                new UpdateEntityEvent({
                                     uuid: entity.uuid,
                                     entityType: entity.type,
                                     state: entity.state,

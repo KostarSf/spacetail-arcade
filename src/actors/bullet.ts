@@ -1,11 +1,12 @@
 import { CollisionType, Vector, vec } from "excalibur";
 import { NetActor } from "~/network/NetActor";
-import { DamageAction } from "~/network/events";
-import { NetEntityType, SerializedVector } from "~/network/types";
+import { DamageAction } from "~/network/events/actions/DamageAction";
+import { SerializableObject } from "~/network/events/types";
+import { ActorType, SerializedVector } from "~/network/types";
 import { round, vecToArray } from "~/utils/math";
 import { Animations } from "../resources";
 
-export interface BulletState {
+export interface BulletState extends SerializableObject {
     shooter: string | null;
     pos: SerializedVector;
     vel: SerializedVector;
@@ -29,7 +30,7 @@ export interface BulletState {}
 export class Bullet extends NetActor<BulletState> {
     public static readonly Tag = "bullet";
 
-    public type: NetEntityType = NetEntityType.Bullet;
+    public type: ActorType = ActorType.Bullet;
 
     public shooter: NetActor | null;
     public damage: number;
@@ -76,7 +77,7 @@ export class Bullet extends NetActor<BulletState> {
             }
         });
 
-        this.actions.delay(500).die();
+        this.actions.delay(5000).die();
     }
 
     public serializeState(): BulletState {

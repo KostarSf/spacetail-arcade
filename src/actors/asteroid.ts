@@ -2,12 +2,13 @@ import { CollisionType, Color, Engine, TwoPI, Vector } from "excalibur";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
-import { ActionEvent } from "~/network/events";
-import { ActionEventType, NetEntityType, SerializedVector } from "~/network/types";
+import { NetAction } from "~/network/events/actions/NetAction";
+import { ActionType, SerializableObject } from "~/network/events/types";
+import { ActorType, SerializedVector } from "~/network/types";
 import { round, vec, vecToArray } from "~/utils/math";
 import { Resources } from "../resources";
 
-export interface AsteroidState {
+export interface AsteroidState extends SerializableObject {
     pos: SerializedVector;
     vel: SerializedVector;
     rotation: number;
@@ -29,7 +30,7 @@ export interface AsteroidOptions {
 export class Asteroid extends NetActor<AsteroidState> {
     public static readonly Tag = "asteroid";
 
-    public readonly type: NetEntityType = NetEntityType.Asteroid;
+    public readonly type: ActorType = ActorType.Asteroid;
 
     private radius: number;
 
@@ -82,6 +83,11 @@ export class Asteroid extends NetActor<AsteroidState> {
         if (this.graphics.current && this.graphics.current.tint !== tint) {
             this.graphics.current.tint = tint;
         }
+
+        const limit = 500;
+        if (Math.abs(this.pos.x) > limit || Math.abs(this.pos.y) > limit) {
+            this.kill();
+        }
     }
 
     public serializeState(): AsteroidState {
@@ -108,9 +114,9 @@ export class Asteroid extends NetActor<AsteroidState> {
         this.netBody.mass = state.mass;
     }
 
-    protected receiveAction(action: ActionEvent, _latency: number): void {
+    protected receiveAction(action: NetAction, _latency: number): void {
         switch (action.type) {
-            case ActionEventType.Damage:
+            case ActionType.Damage:
                 this.kill();
         }
     }

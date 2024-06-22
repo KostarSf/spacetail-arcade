@@ -17,7 +17,7 @@ import { netClient } from "~/network/NetClient";
 import { UuidComponent } from "../ecs/UuidComponent";
 import { SolidBodyComponent } from "../ecs/physics.ecs";
 import { Animations, Resources } from "../resources";
-import { Bullet } from "./bullet";
+import { Bullet } from "./Bullet";
 
 export interface ShipOptions {
     uuid?: string;

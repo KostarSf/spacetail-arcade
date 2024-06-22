@@ -1,7 +1,8 @@
 import { Color, DisplayMode, Engine } from "excalibur";
+import Network from "./network/Network";
+import { registerNetEvents } from "./network/events/registry";
 import { loader } from "./resources";
 import { NetScene } from "./scenes/NetScene";
-import Network from "./network/Network";
 
 class Game extends Engine {
     constructor() {
@@ -22,6 +23,7 @@ class Game extends Engine {
     }
 
     initialize() {
+        registerNetEvents();
         this.start(loader).then(async () => {
             await Network.connect();
 
