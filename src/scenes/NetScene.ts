@@ -55,7 +55,7 @@ export class NetScene extends Scene {
     }
 
     private trySpawnAsteroids() {
-        const maxAsteroidsCount = 5;
+        const maxAsteroidsCount = 50;
 
         if (this.asteroidsQuery.entities.length >= maxAsteroidsCount) {
             return;
