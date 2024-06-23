@@ -28,8 +28,8 @@ class Network {
     private killedEntities: Set<string>;
     private entityActionsEvents: EntityActionEvent[];
 
-    private simulatedLatency = rand.integer(0, 50);
-    private simulatedClockDrift = rand.integer(-300, 300);
+    private simulatedLatency = 0 //rand.integer(0, 50);
+    private simulatedClockDrift = 0 //rand.integer(-300, 300);
 
     private _ping = 0;
     private _clockOffset = 0;
