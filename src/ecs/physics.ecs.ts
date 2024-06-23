@@ -20,6 +20,7 @@ import { DamageAction } from "~/network/events/actions/DamageAction";
 import { NetActor } from "~/network/NetActor";
 import { NetStateComponent } from "~/network/NetStateComponent";
 import { StatsComponent } from "./stats.ecs";
+import { ReceiverType } from "~/network/events/types";
 
 export interface NetBodyOptions {
     mass: number;
@@ -52,8 +53,8 @@ export class NetBodyComponent extends Component {
         owner.get(ColliderComponent).events.on("precollision", (evt: any) => {
             const precollision = evt as PreCollisionEvent<Collider>;
 
-            const target = precollision.target.owner;
-            const other = precollision.other.owner;
+            const target = precollision.target.owner as NetActor;
+            const other = precollision.other.owner as NetActor | WorldBorder;
 
             const thisBody = target.get(NetBodyComponent);
 
@@ -95,14 +96,28 @@ export class NetBodyComponent extends Component {
             const impulse = collisionNormal.scale(impulseScalar);
             thisBody.nextVel = thisBody.vel.sub(impulse.scale(1 / thisBody.mass));
 
-            if (velocityAlongNormal < -50 && target.has(StatsComponent)) {
-                (target as NetActor).sendAction(
-                    new DamageAction({
-                        damage: 0.01 * (otherBody.mass / thisBody.mass) * -velocityAlongNormal,
-                        armorDeflection: 0.5,
-                        healthDeflection: 1,
-                    })
-                );
+            if (!target.isReplica) {
+                const threshhold = Math.max(0, relativeVelocity.distance() - 50);
+                if (threshhold > 0 && target.has(StatsComponent)) {
+                    const stats = target.get(StatsComponent);
+                    const otherStats = other.get(StatsComponent) ?? stats;
+
+                    const alpha = 0.03;
+                    const massRatio = thisBody.mass / otherBody.mass;
+                    const massInfluence = 1 + Math.tanh(alpha * (1 - massRatio));
+                    (target as NetActor).sendAction(
+                        new DamageAction({
+                            damage:
+                                0.5 *
+                                (otherStats.hardness / stats.hardness) *
+                                threshhold *
+                                massInfluence,
+                            armorDeflection: 0.5,
+                            healthDeflection: 1,
+                        }),
+                        { self: false, receiver: ReceiverType.AllClients }
+                    );
+                }
             }
         });
 

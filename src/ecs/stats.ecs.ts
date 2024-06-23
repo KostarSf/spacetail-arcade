@@ -33,6 +33,8 @@ export interface StatsComponentOptions {
     maxPower?: number;
     powerRecoverySpeed?: number;
 
+    hardness?: number;
+
     healthResistance?: number;
     armorResistance?: number;
 }
@@ -47,6 +49,8 @@ export class StatsComponent extends Component {
     public power: number;
     public maxPower: number;
     public powerRecoverySpeed: number;
+
+    public hardness: number;
 
     public healthResistance: number;
     public armorResistance: number;
@@ -72,6 +76,8 @@ export class StatsComponent extends Component {
 
         this.healthResistance = options.healthResistance ?? 1;
         this.armorResistance = options.armorResistance ?? 1;
+
+        this.hardness = options.hardness ?? 10;
 
         this.isStale = false;
     }
@@ -190,6 +196,7 @@ export class StatsSystem extends System {
                     new StatsChangeAction({
                         health: stats.health,
                         power: stats.power,
+                        hardness: stats.hardness,
                     }),
                     { self: false }
                 );

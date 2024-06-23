@@ -56,7 +56,7 @@ export class Asteroid extends NetActor<AsteroidState> {
 
         this.addTag(Asteroid.Tag);
 
-        this.addComponent(new StatsComponent({ health: 50, power: 0 }));
+        this.addComponent(new StatsComponent({ health: 50, power: 0, hardness: 20 }));
         this.addComponent(new NetBodyComponent({ mass: options.mass ?? 10 }));
 
         this.radius = radius;

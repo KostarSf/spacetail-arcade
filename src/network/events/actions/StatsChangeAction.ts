@@ -12,6 +12,8 @@ export interface StatsChangeState extends SerializableObject {
 
     // healthResistance: number;
     // armorResistance: number;
+
+    hardness: number;
 }
 
 export class StatsChangeAction extends NetAction {
@@ -28,6 +30,8 @@ export class StatsChangeAction extends NetAction {
     // healthResistance: number;
     // armorResistance: number;
 
+    hardness: number;
+
     constructor(state: StatsChangeState) {
         super();
 
@@ -41,6 +45,8 @@ export class StatsChangeAction extends NetAction {
 
         // this.healthResistance = state.healthResistance;
         // this.armorResistance = state.armorResistance;
+
+        this.hardness = state.hardness;
     }
 
     public serialize(): StatsChangeState {
@@ -55,6 +61,8 @@ export class StatsChangeAction extends NetAction {
 
             // healthResistance: this.healthResistance,
             // armorResistance: this.armorResistance,
+
+            hardness: this.hardness,
         };
     }
 }

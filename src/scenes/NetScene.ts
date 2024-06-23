@@ -32,8 +32,10 @@ export class NetScene extends Scene {
     public asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
     public playersQuery!: TagQuery<typeof Player.Tag>;
 
-    public readonly worldSize = 10_000;
-    public readonly maxAsteroidsCount = 500;
+    public readonly worldSize = 5_000;
+    public readonly maxAsteroidsCount = 200;
+    public readonly detectRadius = 2500;
+    public readonly detectRadiusSquare = Math.pow(this.detectRadius, 2);
 
     constructor() {
         super();
@@ -193,6 +195,7 @@ class SpaceGraphics {
 
         const player = this.scene.player;
         const worldSize = this.scene.worldSize;
+        const detectRadius = this.scene.detectRadiusSquare;
 
         const mapSize = 64;
         const mapOffset = 32;
@@ -217,8 +220,7 @@ class SpaceGraphics {
 
         this.scene.asteroidsQuery.entities.forEach((entity) => {
             transform = entity.get(TransformComponent);
-            if (player.pos.squareDistance(transform.pos) > 9_000_000) {
-                // 3000^2
+            if (player.pos.squareDistance(transform.pos) > detectRadius) {
                 return;
             }
 
@@ -232,8 +234,7 @@ class SpaceGraphics {
 
         this.scene.playersQuery.entities.forEach((entity) => {
             transform = entity.get(TransformComponent);
-            if (entity === player || player.pos.squareDistance(transform.pos) > 9_000_000) {
-                // 3000^2
+            if (entity === player || player.pos.squareDistance(transform.pos) > detectRadius) {
                 return;
             }
 

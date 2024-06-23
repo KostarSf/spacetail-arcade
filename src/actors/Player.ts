@@ -65,7 +65,9 @@ export class Player extends NetActor<PlayerState> {
 
         this.addTag(Player.Tag);
 
-        this.addComponent(new StatsComponent({ health: 50, power: 25, powerRecoverySpeed: 10 }));
+        this.addComponent(
+            new StatsComponent({ health: 50, power: 25, powerRecoverySpeed: 10, hardness: 10 })
+        );
         this.addComponent(new NetBodyComponent({ mass: 10 }));
     }
 
@@ -197,7 +199,6 @@ export class Player extends NetActor<PlayerState> {
         if (!isEnoughPower) {
             return;
         }
-
 
         const direction = Vector.fromAngle(this.rotation);
         const pos = this.pos.add(direction.scale(15));
