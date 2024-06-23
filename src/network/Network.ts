@@ -1,4 +1,3 @@
-import { rand } from "~/utils/math";
 import { ClientPingEvent } from "./events/ClientPingEvent";
 import { CreateEntityEvent } from "./events/CreateEntityEvent";
 import { EntitiesListEvent } from "./events/EntitiesListEvent";
@@ -28,8 +27,8 @@ class Network {
     private killedEntities: Set<string>;
     private entityActionsEvents: EntityActionEvent[];
 
-    private simulatedLatency = 0 //rand.integer(0, 50);
-    private simulatedClockDrift = 0 //rand.integer(-300, 300);
+    private simulatedLatency = 0; //rand.integer(0, 50);
+    private simulatedClockDrift = 0; //rand.integer(-300, 300);
 
     private _ping = 0;
     private _clockOffset = 0;
