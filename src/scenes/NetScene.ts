@@ -1,25 +1,39 @@
-import { EmitterType, Engine, ParticleEmitter, Scene, TagQuery, Timer, vec } from "excalibur";
+import {
+    Color,
+    EmitterType,
+    Engine,
+    ExcaliburGraphicsContext,
+    ParticleEmitter,
+    Scene,
+    TagQuery,
+    Timer,
+    TransformComponent,
+    vec,
+    Vector,
+} from "excalibur";
 import { Asteroid } from "~/actors/Asteroid";
 import { Player } from "~/actors/Player";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
 import { StatsSystem } from "~/ecs/stats.ecs";
 import { Decal } from "~/entities/Decal";
+import { WorldBorder } from "~/entities/WorldBorder";
 import { NetSystem } from "~/network/NetSystem";
 import Network from "~/network/Network";
 import { Resources } from "~/resources";
 import { UI } from "~/ui/web-ui";
-import { easeOut, lerp, rand } from "~/utils/math";
+import { easeOut, lerp, linInt, rand } from "~/utils/math";
 
 export class NetScene extends Scene {
     public static readonly Key = "net-scene";
 
-    public player!: Player;
+    public player?: Player;
     public graphics: SpaceGraphics;
 
-    private asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
-    private playersQuery!: TagQuery<typeof Player.Tag>;
+    public asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
+    public playersQuery!: TagQuery<typeof Player.Tag>;
 
-    private asteroidsDistanceLimit = 1000;
+    public readonly worldSize = 10_000;
+    public readonly maxAsteroidsCount = 500;
 
     constructor() {
         super();
@@ -35,7 +49,7 @@ export class NetScene extends Scene {
         this.world.add(NetPhysicsSystem);
         this.world.add(StatsSystem);
 
-        const playerPosLimit = 100;
+        const playerPosLimit = this.worldSize * 0.8;
         this.player = new Player({
             pos: vec(
                 rand.integer(-playerPosLimit, playerPosLimit),
@@ -45,12 +59,15 @@ export class NetScene extends Scene {
 
         this.graphics.initialize(engine);
 
+        const worldBorder = new WorldBorder(this.worldSize);
+        this.add(worldBorder);
+
         this.add(this.player);
 
         const asteroidsSpawnTimer = new Timer({
             random: rand,
-            randomRange: [0, 1500],
-            interval: 500,
+            randomRange: [0, 1000],
+            interval: 100,
             repeats: true,
             fcn: () => this.trySpawnAsteroids(),
         });
@@ -59,9 +76,7 @@ export class NetScene extends Scene {
     }
 
     private trySpawnAsteroids() {
-        const maxAsteroidsCount = 50;
-
-        if (this.asteroidsQuery.entities.length >= maxAsteroidsCount) {
+        if (this.asteroidsQuery.entities.length >= this.maxAsteroidsCount) {
             return;
         }
 
@@ -70,7 +85,7 @@ export class NetScene extends Scene {
             return;
         }
 
-        const posLimit = this.asteroidsDistanceLimit;
+        const posLimit = this.worldSize;
         const velLimit = 10;
 
         const asteroid = new Asteroid({
@@ -86,7 +101,7 @@ export class NetScene extends Scene {
     onPostUpdate(engine: Engine<any>, delta: number): void {
         this.graphics.update(engine, delta);
 
-        const limit = this.asteroidsDistanceLimit;
+        const limit = this.worldSize;
         this.asteroidsQuery.entities.forEach((asteroid) => {
             if (
                 Math.abs((asteroid as Asteroid).pos.x) > limit ||
@@ -102,6 +117,10 @@ export class NetScene extends Scene {
             `players: ${this.playersQuery.entities.length}, ` +
             `asteroids: ${this.asteroidsQuery.entities.length}`;
         UI.debugText.setText(debug);
+    }
+
+    onPostDraw(ctx: ExcaliburGraphicsContext, delta: number): void {
+        this.graphics.draw(ctx, delta);
     }
 }
 
@@ -141,32 +160,103 @@ class SpaceGraphics {
         });
         this.scene.add(this.starsParticles);
 
-        this.scene.camera.strategy.radiusAroundActor(this.scene.player, 50);
-        this.scene.player.on("damage", () => {
-            this.scene.camera.shake(5, 5, 100);
-        });
-        this.scene.player.on("postupdate", (evt) => {
-            const player = evt.target as Player;
+        if (this.scene.player) {
+            this.scene.camera.strategy.radiusAroundActor(this.scene.player, 50);
+            this.scene.player.on("damage", () => {
+                this.scene.camera.shake(5, 5, 100);
+            });
+            this.scene.player.on("postupdate", (evt) => {
+                const player = evt.target as Player;
 
-            if (player.accelerated) {
-                const speed = Math.max(2, player.vel.distance() * 0.003);
-                this.scene.camera.shake(speed, speed, 200);
-            }
-        });
+                if (player.accelerated) {
+                    const speed = Math.max(2, player.vel.distance() * 0.003);
+                    this.scene.camera.shake(speed, speed, 200);
+                }
+            });
+        }
     }
 
     update(engine: Engine, delta: number) {
-        this.starsParticles.transform.pos = this.scene.player.pos.sub(
-            vec(engine.halfDrawWidth, engine.halfDrawHeight)
-        );
+        if (this.scene.player) {
+            this.starsParticles.transform.pos = this.scene.player.pos.sub(
+                vec(engine.halfDrawWidth, engine.halfDrawHeight)
+            );
 
-        this.updateCamera(engine, delta);
+            this.updateCamera(engine, delta, this.scene.player);
+        }
     }
 
-    private updateCamera(engine: Engine, delta: number) {
+    draw(ctx: ExcaliburGraphicsContext, _delta: number): void {
+        if (!this.scene.player) {
+            return;
+        }
+
+        const player = this.scene.player;
+        const worldSize = this.scene.worldSize;
+
+        const mapSize = 64;
+        const mapOffset = 32;
+        const offset = vec(mapOffset, mapOffset);
+
+        const background = Color.Black;
+        background.a = 0.8;
+
+        ctx.drawRectangle(
+            offset.sub(vec(2, 2)),
+            mapSize + 4,
+            mapSize + 4,
+            background,
+            Color.Transparent
+        );
+        ctx.drawRectangle(offset, mapSize, mapSize, Color.Transparent, Color.Gray, 2);
+
+        let transform: TransformComponent;
+        let pos: Vector;
+
+        const dark = Color.fromHex("#333333");
+
+        this.scene.asteroidsQuery.entities.forEach((entity) => {
+            transform = entity.get(TransformComponent);
+            if (player.pos.squareDistance(transform.pos) > 9_000_000) {
+                // 3000^2
+                return;
+            }
+
+            pos = vec(
+                linInt(transform.pos.x, -worldSize, worldSize, 0, mapSize - 2),
+                linInt(transform.pos.y, -worldSize, worldSize, 0, mapSize - 2)
+            ).addEqual(offset);
+
+            ctx.drawRectangle(pos, 1, 1, dark);
+        });
+
+        this.scene.playersQuery.entities.forEach((entity) => {
+            transform = entity.get(TransformComponent);
+            if (entity === player || player.pos.squareDistance(transform.pos) > 9_000_000) {
+                // 3000^2
+                return;
+            }
+
+            pos = vec(
+                linInt(transform.pos.x, -worldSize, worldSize, 0, mapSize - 2),
+                linInt(transform.pos.y, -worldSize, worldSize, 0, mapSize - 2)
+            ).addEqual(offset);
+
+            ctx.drawRectangle(pos, 4, 4, Color.Red);
+        });
+
+        pos = vec(
+            linInt(player.pos.x, -worldSize, worldSize, 0, mapSize - 2),
+            linInt(player.pos.y, -worldSize, worldSize, 0, mapSize - 2)
+        ).addEqual(offset);
+
+        ctx.drawRectangle(pos, 2, 2, Color.Cyan);
+    }
+
+    private updateCamera(engine: Engine, delta: number, player: Player) {
         delta = delta / 1000;
 
-        const speed = this.scene.player.vel.distance();
+        const speed = player.vel.distance();
 
         const zoomFactor = lerp(speed, 0, 1000, easeOut);
         const newZoom = 1.1 - zoomFactor * 0.4;

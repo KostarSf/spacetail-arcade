@@ -139,9 +139,12 @@ export abstract class NetActor<NetState extends SerializableObject = {}> extends
                         value: -damage,
                         vel: this.vel.scale(0.2),
                     });
-                    const explosion = new Explosion(this.pos);
 
-                    this.scene?.add(explosion);
+                    if (damage >= 1) {
+                        const explosion = new Explosion(this.pos);
+                        this.scene?.add(explosion);
+                    }
+
                     this.scene?.add(label);
                 }
 

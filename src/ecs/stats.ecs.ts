@@ -97,7 +97,7 @@ export class StatsComponent extends Component {
     }): number {
         const { damage, healthDeflection = 1, armorDeflection = 1, direction = null } = args;
 
-        if (damage <= 0) {
+        if (damage <= 0.01) {
             return 0;
         }
 

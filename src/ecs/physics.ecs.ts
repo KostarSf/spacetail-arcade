@@ -15,8 +15,11 @@ import {
     World,
 } from "excalibur";
 import { Explosion } from "~/entities/Explosion";
+import { WorldBorder } from "~/entities/WorldBorder";
+import { DamageAction } from "~/network/events/actions/DamageAction";
 import { NetActor } from "~/network/NetActor";
 import { NetStateComponent } from "~/network/NetStateComponent";
+import { StatsComponent } from "./stats.ecs";
 
 export interface NetBodyOptions {
     mass: number;
@@ -51,11 +54,24 @@ export class NetBodyComponent extends Component {
 
             const target = precollision.target.owner;
             const other = precollision.other.owner;
+
+            const thisBody = target.get(NetBodyComponent);
+
+            if (other.hasTag(WorldBorder.Tag)) {
+                const border = other as WorldBorder;
+
+                const { pos, vel } = border.processCollision(thisBody.pos, thisBody.vel);
+
+                thisBody.pos.setTo(pos.x, pos.y);
+                thisBody.nextVel = vel;
+
+                return;
+            }
+
             if (!other.has(NetBodyComponent)) {
                 return;
             }
 
-            const thisBody = target.get(NetBodyComponent);
             const otherBody = other.get(NetBodyComponent);
 
             const collisionDirection = otherBody.pos.sub(thisBody.pos);
@@ -78,6 +94,16 @@ export class NetBodyComponent extends Component {
 
             const impulse = collisionNormal.scale(impulseScalar);
             thisBody.nextVel = thisBody.vel.sub(impulse.scale(1 / thisBody.mass));
+
+            if (velocityAlongNormal < -50 && target.has(StatsComponent)) {
+                (target as NetActor).sendAction(
+                    new DamageAction({
+                        damage: 0.01 * (otherBody.mass / thisBody.mass) * -velocityAlongNormal,
+                        armorDeflection: 0.5,
+                        healthDeflection: 1,
+                    })
+                );
+            }
         });
 
         owner.on("kill", () => {
