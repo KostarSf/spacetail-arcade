@@ -1,100 +1,113 @@
-import { Actor, Color, Engine, Vector } from "excalibur";
-import { netClient } from "~/network/NetClient";
-import { vec, vecToArray } from "~/utils/math";
-import { UuidComponent } from "../ecs/UuidComponent";
-import { SolidBodyComponent } from "../ecs/physics.ecs";
-import { Resources } from "../resources";
+import { CollisionType, Color, Engine, TwoPI, Vector } from "excalibur";
+import { NetBodyComponent } from "~/ecs/physics.ecs";
+import { StatsComponent } from "~/ecs/stats.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
-import { HealthComponent } from "~/ecs/health.ecs";
+import { NetActor } from "~/network/NetActor";
+import { SerializableObject } from "~/network/events/types";
+import { ActorType, SerializedVector } from "~/network/types";
+import { round, vec, vecToArray } from "~/utils/math";
+import { Resources } from "../resources";
+
+export interface AsteroidState extends SerializableObject {
+    pos: SerializedVector;
+    vel: SerializedVector;
+    rotation: number;
+    angularVelocity: number;
+    mass: number;
+}
 
 export interface AsteroidOptions {
     uuid?: string;
-    pos: Vector | [number, number];
+    isReplica?: boolean;
+
+    pos?: Vector | [number, number];
     vel?: Vector | [number, number];
-    mass: number;
+    mass?: number;
     rotation?: number;
     angularVelocity?: number;
 }
 
-export type AsteroidSerialize = ReturnType<(typeof Asteroid)["prototype"]["serialize"]>;
+export class Asteroid extends NetActor<AsteroidState> {
+    public static readonly Tag = "asteroid";
 
-export class Asteroid extends Actor {
-    public static readonly Tag: string = "asteroid";
+    public readonly type: ActorType = ActorType.Asteroid;
 
-    get uuid() {
-        return this.get(UuidComponent).uuid;
+    private radius: number;
+
+    get netBody() {
+        return this.get(NetBodyComponent);
     }
 
-    get solidBody() {
-        return this.get(SolidBodyComponent);
-    }
+    constructor(options: AsteroidOptions = {}) {
+        const radius = 10;
 
-    get health() {
-        return this.get(HealthComponent);
-    }
-
-    constructor(options: AsteroidOptions) {
         super({
+            name: "Asteroid",
+            uuid: options.uuid,
+            isReplica: options.isReplica,
+
             pos: options.pos ? vec(options.pos) : undefined,
             vel: options.vel ? vec(options.vel) : undefined,
             rotation: options.rotation,
             angularVelocity: options.angularVelocity,
-            radius: 10,
+            radius: radius,
+            collisionType: CollisionType.Passive,
         });
 
-        this.addComponent(new UuidComponent(options.uuid));
-        this.addComponent(new SolidBodyComponent({ mass: options.mass }));
-        this.addComponent(new HealthComponent({ health: 50, labelsAnchor: vec(0, -12) }));
-
         this.addTag(Asteroid.Tag);
+
+        this.addComponent(new StatsComponent({ health: 50, power: 0 }));
+        this.addComponent(new NetBodyComponent({ mass: options.mass ?? 10 }));
+
+        this.radius = radius;
     }
 
     onInitialize(_engine: Engine): void {
-        const sprite = ShadowedSprite.from(Resources.Asteroid);
-        sprite.tint = Color.DarkGray;
-
+        const tint = this.isReplica ? Color.Orange : Color.DarkGray;
+        const sprite = ShadowedSprite.from(Resources.Asteroid, tint);
         this.graphics.add(sprite);
 
-        this.on("kill", () => {
-            if (!netClient.isHost) {
-                return;
+        this.on("precollision", (event) => {
+            if (!this.isReplica && event.other.hasTag(Asteroid.Tag)) {
+                const other = event.other as Asteroid;
+
+                const normal = other.pos.sub(this.pos);
+                if (normal.distance() <= this.radius + 0.5) {
+                    this.vel = this.vel.add(normal.normalize().negate().scale(1));
+                }
             }
-
-            netClient.send({
-                type: "entity",
-                action: "remove",
-                target: this.uuid,
-                time: netClient.getTime(),
-            });
-        });
-
-        if (netClient.isHost) {
-            netClient.send({
-                type: "entity",
-                action: "spawn",
-                target: this.uuid,
-                time: netClient.getTime(),
-                data: {
-                    class: "Asteroid",
-                    time: netClient.getTime(),
-                    args: this.serialize(),
-                },
-            });
-        }
-
-        this.health.events.on("death", () => {
-            this.kill();
         });
     }
 
-    public serialize() {
+    onPostUpdate(engine: Engine<any>, _delta: number): void {
+        const tint = engine.isDebug && this.isReplica ? Color.Orange : Color.DarkGray;
+
+        if (this.graphics.current && this.graphics.current.tint !== tint) {
+            this.graphics.current.tint = tint;
+        }
+    }
+
+    public serializeState(): AsteroidState {
         return {
-            uuid: this.uuid,
             pos: vecToArray(this.pos, 2),
             vel: vecToArray(this.vel, 2),
-            mass: this.solidBody.mass,
-            rotation: this.rotation,
-            angularVelocity: this.angularVelocity,
+            rotation: round(this.rotation, 2),
+            angularVelocity: round(this.angularVelocity, 2),
+            mass: this.netBody.mass,
         };
+    }
+
+    public updateState(state: AsteroidState, latency: number): void {
+        this.pos = vec(...state.pos);
+        this.vel = vec(...state.vel);
+        this.rotation = state.rotation;
+        this.angularVelocity = state.angularVelocity;
+
+        const delta = latency / 1000;
+
+        const newRotation = (this.angularVelocity * delta) % TwoPI;
+        this.rotation += newRotation + (newRotation < 0 ? TwoPI : 0);
+        this.pos.addEqual(this.vel.scale(delta));
+        this.netBody.mass = state.mass;
     }
 }

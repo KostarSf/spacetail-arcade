@@ -1,6 +1,8 @@
-import { Color, DisplayMode, Engine } from "excalibur";
+import { Color, DisplayMode, Engine, Keys } from "excalibur";
+import Network from "./network/Network";
+import { registerNetEvents } from "./network/events/registry";
 import { loader } from "./resources";
-import { GameLevel } from "./scenes/GameLevel";
+import { NetScene } from "./scenes/NetScene";
 
 class Game extends Engine {
     constructor() {
@@ -12,8 +14,8 @@ class Game extends Engine {
             backgroundColor: Color.Black,
             canvasElementId: "game",
             scenes: {
-                "game-level": {
-                    scene: GameLevel,
+                [NetScene.Key]: {
+                    scene: NetScene,
                 },
             },
             fixedUpdateFps: 50,
@@ -21,8 +23,17 @@ class Game extends Engine {
     }
 
     initialize() {
-        this.start(loader).then(() => {
-            this.goToScene("game-level");
+        registerNetEvents();
+        this.start(loader).then(async () => {
+            this.input.keyboard.on("press", (evt) => {
+                if (evt.key === Keys.P) {
+                    this.toggleDebug();
+                }
+            });
+
+            await Network.connect();
+
+            this.goToScene(NetScene.Key);
         });
     }
 }

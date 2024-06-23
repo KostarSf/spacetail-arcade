@@ -1,235 +1,244 @@
-import WebSocket, { WebSocketServer } from "ws";
-import { EntityEventData, NetEvent } from "../src/network/events";
+import { WebSocket, WebSocketServer } from "ws";
+import { PlayerState } from "~/actors/Player";
+import { CreateEntityEvent } from "~/network/events/CreateEntityEvent";
+import { EntitiesListEvent } from "~/network/events/EntitiesListEvent";
+import { EntityEvent } from "~/network/events/EntityEvent";
+import { EntityWithStateEvent } from "~/network/events/EntityWithStateEvent";
+import { KillEntityEvent } from "~/network/events/KillEntityEvent";
+import { NetEvent } from "~/network/events/NetEvent";
+import { ServerPongEvent } from "~/network/events/ServerPongEvent";
+import { UpdateEntityEvent } from "~/network/events/UpdateEntityEvent";
+import { registerNetEvents } from "~/network/events/registry";
+import { EventType, ReceiverType } from "~/network/events/types";
+import { ActorType } from "~/network/types";
+
+class PlayerConnection {
+    public hostEntities: Map<string, ServerEntity>;
+
+    constructor(public socket: WebSocket, public playerEntity: ServerPlayer | null = null) {
+        this.hostEntities = new Map();
+    }
+}
+
+class ServerEntity<TState = {}> {
+    constructor(
+        public uuid: string,
+        public type: ActorType,
+        public state: TState,
+        public updateTime: number
+    ) {}
+}
+
+class ServerPlayer extends ServerEntity<PlayerState> {
+    constructor(
+        public connection: PlayerConnection,
+        uuid: string,
+        state: PlayerState,
+        updateTime: number
+    ) {
+        super(uuid, ActorType.Player, state, updateTime);
+    }
+}
+
+const activePlayers = new Map<string, ServerPlayer>();
+const gameEntities = new Map<string, ServerEntity>();
 
 export function runGameServer(port?: number) {
+    registerNetEvents();
+
     const server = new WebSocketServer({ port: port ?? 8080 });
 
-    type PlayerData = {
-        uuid: string;
-        pos: [number, number];
-        vel: [number, number];
-        rotation: number;
-        accelerated: boolean;
-    };
-
-    let players: {
-        socket: WebSocket;
-        isHost: boolean;
-        data: PlayerData | null;
-        lastUpdateTime: number;
-        latency: number;
-    }[] = [];
-
-    let entities: Map<string, EntityEventData> = new Map();
-
     server.on("connection", (ws) => {
-        const player: (typeof players)[number] = {
-            socket: ws,
-            data: null,
-            isHost: false,
-            lastUpdateTime: Date.now(),
-            latency: 0,
-        };
-        players.push(player);
+        console.log(`New client connected (${server.clients.size})`);
 
-        console.log(`New client connected (${players.length})`);
-        setNewHostIfNeeded();
+        const playerConnection = new PlayerConnection(ws);
 
-        ws.on("ping", (_data) => {
-            // console.log("ping", data);
-        });
-
-        ws.on("pong", (_data) => {
-            // console.log("pong", data);
-        });
-
-        ws.on("message", async (message) => {
-            players.forEach(({ socket }) => {
-                if (socket !== ws && socket.readyState === WebSocket.OPEN) {
-                    socket.send(message);
-                }
+        const entityEventsList: EntityWithStateEvent[] = [];
+        gameEntities.forEach((entity) => {
+            const entityEvent = new UpdateEntityEvent({
+                uuid: entity.uuid,
+                entityType: entity.type,
+                state: entity.state,
+                time: entity.updateTime,
             });
+            entityEventsList.push(entityEvent);
+        });
+        const entitiesListEvent = new EntitiesListEvent({
+            entities: entityEventsList,
+            time: Date.now(),
+        });
+        ws.send(entitiesListEvent.serialize());
 
-            const data = JSON.parse(message.toString()) as NetEvent;
-            if (data.type === "player") {
-                player.data = {
-                    uuid: data.target,
-                    pos: data.data.pos,
-                    vel: data.data.vel,
-                    rotation: data.data.rotation,
-                    accelerated: player.data?.accelerated ?? false,
-                };
-                player.lastUpdateTime = data.time;
-
-                if (data.action === "accelerated") {
-                    player.data.accelerated = data.data.value;
-                }
-
-                if (data.action === "spawn") {
-                    const otherPlayers = players.filter(
-                        (player) => player.socket !== ws && player.data !== null
-                    ) as ((typeof players)[number] & {
-                        data: NonNullable<(typeof players)[number]["data"]>;
-                    })[];
-
-                    let now = Date.now();
-
-                    ws.send(
-                        JSON.stringify({
-                            type: "server",
-                            action: "players-list",
-                            target: player.data.uuid,
-                            time: Date.now(),
-                            data: otherPlayers.map((player) => {
-                                const delta = (now - player.lastUpdateTime) / 1000;
-                                const decayFactor = 0.9;
-                                const decay = Math.pow(decayFactor, delta);
-
-                                const vel: [number, number] = [
-                                    player.data.vel[0] * decay,
-                                    player.data.vel[1] * decay,
-                                ];
-
-                                const avgVel: [number, number] = [
-                                    (player.data.vel[0] + vel[0]) / 2,
-                                    (player.data.vel[1] + vel[1]) / 2,
-                                ];
-
-                                const pos: [number, number] = [
-                                    player.data.pos[0] + avgVel[0] * delta,
-                                    player.data.pos[1] + avgVel[1] * delta,
-                                ];
-
-                                return { ...player.data, pos, vel };
-                            }),
-                        } satisfies NetEvent)
-                    );
-
-                    now = Date.now();
-
-                    ws.send(
-                        JSON.stringify({
-                            type: "server",
-                            action: "entities-list",
-                            target: player.data.uuid,
-                            time: Date.now(),
-                            data: Array.from(entities.values()).map((entity) => {
-                                const delta = (now - entity.time) / 1000;
-                                entity.args.pos[0] += entity.args.vel[0] * delta;
-                                entity.args.pos[1] += entity.args.vel[1] * delta;
-                                entity.args.rotation =
-                                    (entity.args.rotation + entity.args.angularVelocity * delta) %
-                                    (Math.PI * 2);
-
-                                return entity;
-                            }),
-                        } satisfies NetEvent)
-                    );
-                }
-
+        ws.on("message", (message) => {
+            const event = NetEvent.parse(message.toString());
+            if (!event) {
                 return;
             }
 
-            if (data.type === "entity") {
-                if (data.action === "spawn") {
-                    entities.set(data.target, {
-                        class: data.data.class,
-                        time: data.data.time,
-                        args: data.data.args,
-                    });
-
-                    return;
-                }
-
-                if (data.action === "update") {
-                    const entity = entities.get(data.target);
-                    if (!entity) {
-                        return;
-                    }
-
-                    entity.args = { ...entity.args, ...data.data };
-                    entity.time = data.time;
-                    return;
-                }
-
-                if (data.action === "remove") {
-                    entities.delete(data.target);
-                }
-            }
-
-            if (data.type === "ping") {
-                const now = Date.now();
-                player.latency = now - data.time;
+            if (event.type === EventType.ServiceClientPing) {
                 ws.send(
-                    JSON.stringify({
-                        type: "server",
-                        action: "pong",
-                        target: player.data?.uuid ?? "none",
-                        time: now,
-                    } satisfies NetEvent)
+                    new ServerPongEvent({
+                        time: event.time,
+                        serverTime: Date.now(),
+                        latency: event.latency,
+                    }).serialize()
                 );
+                return;
             }
+
+            if (event instanceof EntityEvent) {
+                const isPlayerEvent = event.entityType === ActorType.Player;
+
+                switch (event.type) {
+                    case EventType.EntityCreate:
+                        if (isPlayerEvent) {
+                            const playerEntity = new ServerPlayer(
+                                playerConnection,
+                                event.uuid,
+                                (event as CreateEntityEvent<PlayerState>).state,
+                                event.time
+                            );
+
+                            activePlayers.set(event.uuid, playerEntity);
+                            playerConnection.playerEntity = playerEntity;
+
+                            gameEntities.set(event.uuid, playerEntity);
+                        } else {
+                            const entity = new ServerEntity(
+                                event.uuid,
+                                event.entityType,
+                                (event as CreateEntityEvent).state,
+                                event.time
+                            );
+
+                            gameEntities.set(entity.uuid, entity);
+                            playerConnection.hostEntities.set(entity.uuid, entity);
+                        }
+
+                        break;
+
+                    case EventType.EntityUpdate:
+                        if (isPlayerEvent) {
+                            let playerEntity = activePlayers.get(event.uuid);
+
+                            if (!playerEntity) {
+                                playerEntity = new ServerPlayer(
+                                    playerConnection,
+                                    event.uuid,
+                                    (event as UpdateEntityEvent<PlayerState>).state,
+                                    event.time
+                                );
+                                playerConnection.playerEntity = playerEntity;
+                            } else {
+                                playerEntity.state = (
+                                    event as UpdateEntityEvent<PlayerState>
+                                ).state;
+                                playerEntity.updateTime = event.time;
+                            }
+
+                            activePlayers.set(event.uuid, playerEntity);
+                            gameEntities.set(event.uuid, playerEntity);
+                        } else {
+                            let entity = gameEntities.get(event.uuid);
+
+                            if (!entity) {
+                                entity = new ServerEntity(
+                                    event.uuid,
+                                    event.entityType,
+                                    (event as UpdateEntityEvent).state,
+                                    event.time
+                                );
+                            } else {
+                                entity.state = (event as UpdateEntityEvent).state;
+                                entity.updateTime = event.time;
+                            }
+
+                            gameEntities.set(entity.uuid, entity);
+                            playerConnection.hostEntities.set(entity.uuid, entity);
+                        }
+
+                        break;
+
+                    case EventType.EntityKill:
+                        gameEntities.delete(event.uuid);
+
+                        if (isPlayerEvent) {
+                            activePlayers.delete(event.uuid);
+                            playerConnection.playerEntity = null;
+                        } else {
+                            playerConnection.hostEntities.delete(event.uuid);
+                        }
+
+                        break;
+                }
+            }
+
+            server.clients.forEach((socket) => {
+                if (socket !== ws || event.receiver === ReceiverType.AllClients) {
+                    socket.send(event.serialize());
+                }
+            });
         });
 
         ws.on("close", () => {
-            players = players.filter((player) => player.socket !== ws);
-            console.log(`Client disconnected. (${players.length})`);
+            const player = playerConnection.playerEntity;
 
-            if (players.length === 0) {
-                entities.clear();
+            if (player) {
+                gameEntities.delete(player.uuid);
+                activePlayers.delete(player.uuid);
+                playerConnection.playerEntity = null;
+
+                const killEntityEvent = new KillEntityEvent({
+                    entityType: ActorType.Player,
+                    uuid: player.uuid,
+                    time: Date.now(),
+                }).serialize();
+
+                server.clients.forEach((socket) => socket.send(killEntityEvent));
             }
 
-            setNewHostIfNeeded();
+            const orphanEntities = Array.from(playerConnection.hostEntities).map(
+                (entry) => entry[1]
+            );
+            if (orphanEntities.length > 0) {
+                const entitiesPerPlayer = Math.ceil(orphanEntities.length / activePlayers.size);
 
-            if (!player.data) {
-                return;
+                activePlayers.forEach((player) => {
+                    const newOwnedEntities = orphanEntities.splice(0, entitiesPerPlayer);
+                    const entitiesListEvent = new EntitiesListEvent({
+                        entities: newOwnedEntities.map(
+                            (entity) =>
+                                new UpdateEntityEvent({
+                                    uuid: entity.uuid,
+                                    entityType: entity.type,
+                                    state: entity.state,
+                                    isReplica: false,
+                                    time: entity.updateTime,
+                                })
+                        ),
+                        time: Date.now(),
+                    });
+
+                    newOwnedEntities.forEach((entity) => {
+                        player.connection.hostEntities.set(entity.uuid, entity);
+                    });
+                    player.connection.socket.send(entitiesListEvent.serialize());
+                });
             }
 
-            const message = JSON.stringify({
-                type: "entity",
-                action: "remove",
-                time: Date.now(),
-                target: player.data.uuid,
-            } satisfies NetEvent);
+            if (activePlayers.size === 0) {
+                gameEntities.clear();
+            }
 
-            players.forEach(({ socket }) => {
-                if (socket.readyState === WebSocket.OPEN) {
-                    socket.send(message);
-                }
-            });
+            console.log(`Client disconnected (${server.clients.size})`);
         });
     });
 
-    const setNewHostIfNeeded = () => {
-        const hostPlayer = players.find((player) => player.isHost);
-        if (hostPlayer) {
-            return;
-        }
-
-        const newHost = players.at(0);
-        if (!newHost) {
-            return;
-        }
-
-        newHost.isHost = true;
-        newHost.socket.send(
-            JSON.stringify({
-                type: "server",
-                action: "set-host",
-                target: "none",
-                time: Date.now(),
-                data: { isHost: true },
-            } satisfies NetEvent)
-        );
-    };
-
     const closeAllSockets = () => {
         console.log("Shutting down...");
-        players.forEach(({ socket }) => {
+        server.clients.forEach((socket) => {
             socket.close(1000, "Server shutting down");
         });
-
-        players = [];
     };
 
     const handleShutdown = () => {

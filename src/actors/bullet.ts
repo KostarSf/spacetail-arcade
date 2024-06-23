@@ -1,42 +1,67 @@
-import { Actor, CollisionType, Entity, Vector } from "excalibur";
-import { UuidComponent } from "~/ecs/UuidComponent";
-import { HealthComponent } from "~/ecs/health.ecs";
-import { netClient } from "~/network/NetClient";
-import { GameLevel } from "~/scenes/GameLevel";
+import { CollisionType, Vector, vec } from "excalibur";
+import { NetActor } from "~/network/NetActor";
+import { DamageAction } from "~/network/events/actions/DamageAction";
+import { ReceiverType, SerializableObject } from "~/network/events/types";
+import { ActorType, SerializedVector } from "~/network/types";
+import { round, vecToArray } from "~/utils/math";
 import { Animations } from "../resources";
-import { Player } from "./player";
+
+export interface BulletState extends SerializableObject {
+    shooter: string | null;
+    pos: SerializedVector;
+    vel: SerializedVector;
+    rotation: number;
+
+    damage: number;
+    healthDeflection: number;
+    armorDeflection: number;
+}
 
 export interface BulletOptions {
     uuid?: string;
-    actor: Entity;
-    pos: Vector;
-    vel: Vector;
-    damage: number;
+    isReplica?: boolean;
+
+    shooter?: NetActor;
+    pos?: Vector;
+    vel?: Vector;
+    rotation?: number;
+
+    damage?: number;
+    healthDeflection?: number;
+    armorDeflection?: number;
 }
 
-export class Bullet extends Actor {
-    public static readonly energyCost: number = 30;
+export interface BulletState {}
 
-    public readonly actor: Entity;
-    public readonly damage: number;
+export class Bullet extends NetActor<BulletState> {
+    public static readonly Tag = "bullet";
 
-    get uuid() {
-        return this.get(UuidComponent).uuid;
-    }
+    public static powerCost = 10;
+
+    public type: ActorType = ActorType.Bullet;
+
+    public shooter: NetActor | null;
+    public damage: number;
+    public healthDeflection: number;
+    public armorDeflection: number;
 
     constructor(options: BulletOptions) {
         super({
+            name: "Bullet",
+            uuid: options.uuid,
+            isReplica: options.isReplica,
+
             pos: options.pos,
             vel: options.vel,
-            rotation: options.vel.toAngle(),
+            rotation: options.rotation,
             radius: 3,
             collisionType: CollisionType.Passive,
         });
 
-        this.addComponent(new UuidComponent(options.uuid));
-
-        this.actor = options.actor;
-        this.damage = options.damage;
+        this.shooter = options.shooter ?? null;
+        this.damage = options.damage ?? 1;
+        this.healthDeflection = options.healthDeflection ?? 1;
+        this.armorDeflection = options.armorDeflection ?? 1;
     }
 
     onInitialize(): void {
@@ -46,34 +71,56 @@ export class Bullet extends Actor {
         this.graphics.use(animation);
 
         this.on("collisionstart", (evt) => {
-            const canHit = evt.other.has(HealthComponent) || evt.other instanceof Bullet;
-            if (evt.other === this.actor || !canHit) {
+            const other = evt.other;
+
+            if (this.shooter === evt.other || !(other instanceof NetActor)) {
                 return;
             }
 
-            this.kill();
-            evt.other.get(HealthComponent).changeHealth(-this.damage, this);
-        });
-
-        this.on("kill", () => {
-            if (!netClient.isHost && !this.actor.hasTag(Player.Tag)) {
-                return;
-            }
-
-            netClient.send({
-                type: "entity",
-                action: "remove",
-                target: this.uuid,
-                time: netClient.getTime(),
-            });
-        });
-
-        this.on("postupdate", () => {
-            if (!GameLevel.inBounds(this.pos)) {
+            if (!this.isReplica) {
                 this.kill();
+
+                other.sendAction(
+                    new DamageAction({
+                        damage: this.damage,
+                        healthDeflection: this.healthDeflection,
+                        armorDeflection: this.armorDeflection,
+                        direction: this.pos.sub(other.pos).toAngle(),
+                    }),
+                    { self: false, receiver: ReceiverType.AllClients }
+                );
             }
         });
 
         this.actions.delay(5000).die();
+    }
+
+    public serializeState(): BulletState {
+        return {
+            shooter: this.shooter?.uuid ?? null,
+            pos: vecToArray(this.pos, 2),
+            vel: vecToArray(this.vel, 2),
+            rotation: round(this.rotation, 2),
+            damage: round(this.damage, 2),
+            healthDeflection: round(this.healthDeflection, 2),
+            armorDeflection: round(this.armorDeflection, 2),
+        };
+    }
+
+    public updateState(state: BulletState, latency: number, actors: Map<string, NetActor>): void {
+        this.pos = vec(...state.pos);
+        this.vel = vec(...state.vel);
+        this.rotation = state.rotation;
+
+        this.damage = state.damage;
+        this.healthDeflection = state.healthDeflection;
+        this.armorDeflection = state.armorDeflection;
+
+        if (state.shooter) {
+            this.shooter = actors.get(state.shooter) ?? null;
+        }
+
+        const delta = latency / 1000;
+        this.pos.addEqual(this.vel.scale(delta));
     }
 }

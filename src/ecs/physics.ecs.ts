@@ -4,7 +4,6 @@ import {
     ColliderComponent,
     CollisionType,
     Component,
-    Entity,
     MotionComponent,
     PreCollisionEvent,
     Query,
@@ -14,21 +13,19 @@ import {
     TransformComponent,
     Vector,
     World,
-    vec,
 } from "excalibur";
-import { Player } from "~/actors/player";
 import { Explosion } from "~/entities/Explosion";
-import { GameLevel } from "~/scenes/GameLevel";
-import { netClient } from "../network/NetClient";
-import { linInt, round, vecToArray } from "../utils/math";
-import { UuidComponent } from "./UuidComponent";
-import { HealthComponent } from "./health.ecs";
+import { WorldBorder } from "~/entities/WorldBorder";
+import { DamageAction } from "~/network/events/actions/DamageAction";
+import { NetActor } from "~/network/NetActor";
+import { NetStateComponent } from "~/network/NetStateComponent";
+import { StatsComponent } from "./stats.ecs";
 
-export interface SolidBodyOptions {
+export interface NetBodyOptions {
     mass: number;
 }
 
-export class SolidBodyComponent extends Component {
+export class NetBodyComponent extends Component {
     public mass: number;
 
     public nextVel: Vector | null = null;
@@ -41,83 +38,41 @@ export class SolidBodyComponent extends Component {
         return this.owner?.get(MotionComponent).vel!;
     }
 
-    readonly dependencies = [MotionComponent, BodyComponent, ColliderComponent, UuidComponent];
+    readonly dependencies = [MotionComponent, BodyComponent, ColliderComponent, NetStateComponent];
 
-    constructor(options: SolidBodyOptions) {
+    constructor(options: NetBodyOptions) {
         super();
 
         this.mass = options.mass;
     }
 
-    onAdd(owner: Entity<BodyComponent | ColliderComponent | TransformComponent>): void {
+    onAdd(owner: NetActor): void {
         owner.get(BodyComponent).collisionType = CollisionType.Passive;
 
         owner.get(ColliderComponent).events.on("precollision", (evt: any) => {
             const precollision = evt as PreCollisionEvent<Collider>;
 
-            if (precollision.other.owner.hasTag("border")) {
-                const transform = precollision.target.owner.get(TransformComponent);
-                const motion = precollision.target.owner.get(MotionComponent);
-
-                const left = transform.pos.x <= -GameLevel.worldSize;
-                const right = transform.pos.x >= GameLevel.worldSize;
-                const top = transform.pos.y >= GameLevel.worldSize;
-                const bottom = transform.pos.y <= -GameLevel.worldSize;
-
-                let hit = false;
-
-                if ((left && motion.vel.x < 0) || (right && motion.vel.x > 0)) {
-                    motion.vel = motion.vel.scale(vec(-1, 1));
-                    hit = true;
-                }
-
-                if ((top && motion.vel.y > 0) || (bottom && motion.vel.y < 0)) {
-                    motion.vel = motion.vel.scale(vec(1, -1));
-                    hit = true;
-                }
-
-                if (hit) {
-                    motion.vel.scaleEqual(0.3);
-                }
-
-                transform.pos.x = Math.max(
-                    -GameLevel.worldSize,
-                    Math.min(transform.pos.x, GameLevel.worldSize)
-                );
-                transform.pos.y = Math.max(
-                    -GameLevel.worldSize,
-                    Math.min(transform.pos.y, GameLevel.worldSize)
-                );
-
-                return;
-            }
-
-            if (!precollision.other.owner.has(SolidBodyComponent)) {
-                return;
-            }
-
-            if (precollision.target.owner.hasTag(Player.Tag)) {
-                const player = precollision.target.owner as Player;
-                const relativeVelocity = precollision.other.owner
-                    .get(MotionComponent)
-                    .vel.sub(player.vel);
-
-                const scale = linInt(relativeVelocity.squareDistance(), 0, 100_000, 0, 1);
-                const power = scale * 10;
-                const duration = 100 + scale * 400;
-
-                player.scene?.camera.shake(power, power, duration);
-            }
-
             const target = precollision.target.owner;
             const other = precollision.other.owner;
 
-            if (!netClient.isHost) {
+            const thisBody = target.get(NetBodyComponent);
+
+            if (other.hasTag(WorldBorder.Tag)) {
+                const border = other as WorldBorder;
+
+                const { pos, vel } = border.processCollision(thisBody.pos, thisBody.vel);
+
+                thisBody.pos.setTo(pos.x, pos.y);
+                thisBody.nextVel = vel;
+
                 return;
             }
 
-            const thisBody = target.get(SolidBodyComponent);
-            const otherBody = other.get(SolidBodyComponent);
+            if (!other.has(NetBodyComponent)) {
+                return;
+            }
+
+            const otherBody = other.get(NetBodyComponent);
 
             const collisionDirection = otherBody.pos.sub(thisBody.pos);
             if (collisionDirection.squareDistance() === 0) {
@@ -125,7 +80,6 @@ export class SolidBodyComponent extends Component {
             }
 
             const collisionNormal = collisionDirection.normalize();
-
             const relativeVelocity = otherBody.vel.sub(thisBody.vel);
             const velocityAlongNormal = relativeVelocity.dot(collisionNormal);
 
@@ -139,94 +93,53 @@ export class SolidBodyComponent extends Component {
                 (1 / thisBody.mass + 1 / otherBody.mass);
 
             const impulse = collisionNormal.scale(impulseScalar);
-
             thisBody.nextVel = thisBody.vel.sub(impulse.scale(1 / thisBody.mass));
+
+            if (velocityAlongNormal < -50 && target.has(StatsComponent)) {
+                (target as NetActor).sendAction(
+                    new DamageAction({
+                        damage: 0.01 * (otherBody.mass / thisBody.mass) * -velocityAlongNormal,
+                        armorDeflection: 0.5,
+                        healthDeflection: 1,
+                    })
+                );
+            }
         });
 
         owner.on("kill", () => {
             const pos = owner.get(TransformComponent).pos;
             owner.scene?.add(new Explosion(pos));
         });
-
-        owner.on("initialize", () => {
-            const motion = owner.get(MotionComponent)!;
-            const health = owner.get(HealthComponent);
-            const body = owner.get(BodyComponent);
-
-            health?.events.on("damage", (evt) => {
-                if (!evt.damager) {
-                    return;
-                }
-
-                motion.vel.addEqual(
-                    evt.damager.vel.normalize().scale((evt.amount * 5) / body.mass)
-                );
-            });
-        });
     }
 }
 
-export class PhysicsSystem extends System {
+export class NetPhysicsSystem extends System {
     public systemType: SystemType = SystemType.Update;
     public priority: number = SystemPriority.Average;
 
     private query: Query<
-        | typeof SolidBodyComponent
-        | typeof MotionComponent
-        | typeof UuidComponent
-        | typeof TransformComponent
+        typeof NetBodyComponent | typeof MotionComponent | typeof TransformComponent
     >;
 
     constructor(world: World) {
         super();
-        this.query = world.query([SolidBodyComponent]);
+        this.query = world.query([NetBodyComponent]);
     }
 
     update(_elapsedMs: number): void {
-        let body: SolidBodyComponent;
+        let body: NetBodyComponent;
         let motion: MotionComponent;
-        let transform: TransformComponent;
-        let uuid: UuidComponent;
 
-        const offset = GameLevel.worldSize - 16;
-
-        const entities = this.query.entities;
+        const entities = this.query.entities as NetActor[];
         for (let i = 0; i < entities.length; i++) {
-            body = entities[i].get(SolidBodyComponent);
-
+            body = entities[i].get(NetBodyComponent);
             motion = entities[i].get(MotionComponent);
-            transform = entities[i].get(TransformComponent);
-            uuid = entities[i].get(UuidComponent);
-
-            const inBounds = GameLevel.inBounds(transform.pos, -8);
-
-            if (body.nextVel === null && inBounds) {
-                continue;
-            }
 
             if (body.nextVel !== null) {
                 motion.vel = body.nextVel;
                 body.nextVel = null;
+                entities[i].markStale();
             }
-
-            if (!inBounds) {
-                transform.pos.x = Math.max(-offset, Math.min(transform.pos.x, offset));
-                transform.pos.y = Math.max(-offset, Math.min(transform.pos.y, offset));
-            }
-
-            const isPlayer = entities[i].hasTag("player");
-
-            netClient.send({
-                type: isPlayer ? "player" : "entity",
-                action: "update",
-                target: uuid.uuid,
-                time: netClient.getTime(),
-                data: {
-                    pos: vecToArray(transform.pos, 2),
-                    vel: vecToArray(motion.vel, 2),
-                    rotation: round(transform.rotation, 2),
-                },
-            });
         }
     }
 }
