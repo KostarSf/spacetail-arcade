@@ -1,7 +1,7 @@
 import { CollisionType, Vector, vec } from "excalibur";
 import { NetActor } from "~/network/NetActor";
 import { DamageAction } from "~/network/events/actions/DamageAction";
-import { SerializableObject } from "~/network/events/types";
+import { ReceiverType, SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
 import { round, vecToArray } from "~/utils/math";
 import { Animations } from "../resources";
@@ -11,7 +11,10 @@ export interface BulletState extends SerializableObject {
     pos: SerializedVector;
     vel: SerializedVector;
     rotation: number;
+
     damage: number;
+    healthDeflection: number;
+    armorDeflection: number;
 }
 
 export interface BulletOptions {
@@ -22,7 +25,10 @@ export interface BulletOptions {
     pos?: Vector;
     vel?: Vector;
     rotation?: number;
+
     damage?: number;
+    healthDeflection?: number;
+    armorDeflection?: number;
 }
 
 export interface BulletState {}
@@ -30,10 +36,14 @@ export interface BulletState {}
 export class Bullet extends NetActor<BulletState> {
     public static readonly Tag = "bullet";
 
+    public static powerCost = 10;
+
     public type: ActorType = ActorType.Bullet;
 
     public shooter: NetActor | null;
     public damage: number;
+    public healthDeflection: number;
+    public armorDeflection: number;
 
     constructor(options: BulletOptions) {
         super({
@@ -50,6 +60,8 @@ export class Bullet extends NetActor<BulletState> {
 
         this.shooter = options.shooter ?? null;
         this.damage = options.damage ?? 1;
+        this.healthDeflection = options.healthDeflection ?? 1;
+        this.armorDeflection = options.armorDeflection ?? 1;
     }
 
     onInitialize(): void {
@@ -70,9 +82,12 @@ export class Bullet extends NetActor<BulletState> {
 
                 other.sendAction(
                     new DamageAction({
-                        amount: this.damage,
-                        direction: other.pos.sub(this.pos).toAngle(),
-                    })
+                        damage: this.damage,
+                        healthDeflection: this.healthDeflection,
+                        armorDeflection: this.armorDeflection,
+                        direction: this.pos.sub(other.pos).toAngle(),
+                    }),
+                    { self: false, receiver: ReceiverType.AllClients }
                 );
             }
         });
@@ -83,18 +98,23 @@ export class Bullet extends NetActor<BulletState> {
     public serializeState(): BulletState {
         return {
             shooter: this.shooter?.uuid ?? null,
-            damage: round(this.damage, 2),
             pos: vecToArray(this.pos, 2),
             vel: vecToArray(this.vel, 2),
             rotation: round(this.rotation, 2),
+            damage: round(this.damage, 2),
+            healthDeflection: round(this.healthDeflection, 2),
+            armorDeflection: round(this.armorDeflection, 2),
         };
     }
 
     public updateState(state: BulletState, latency: number, actors: Map<string, NetActor>): void {
-        this.damage = state.damage;
         this.pos = vec(...state.pos);
         this.vel = vec(...state.vel);
         this.rotation = state.rotation;
+
+        this.damage = state.damage;
+        this.healthDeflection = state.healthDeflection;
+        this.armorDeflection = state.armorDeflection;
 
         if (state.shooter) {
             this.shooter = actors.get(state.shooter) ?? null;

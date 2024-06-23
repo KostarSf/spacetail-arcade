@@ -12,11 +12,13 @@ import {
     Vector,
     vec,
 } from "excalibur";
-import { linInt } from "~/utils/math";
+import { linInt, round } from "~/utils/math";
 
 export interface HitLabelOptions {
     pos: Vector;
     value: number;
+    round?: number;
+    vel?: Vector;
 }
 
 export class HitLabel extends Entity {
@@ -30,14 +32,16 @@ export class HitLabel extends Entity {
         const motion = new MotionComponent();
 
         transform.pos = options.pos;
-        motion.vel = vec(0, -30);
+        motion.vel = vec(0, -30).addEqual(options.vel ?? Vector.Zero);
 
         super({
             components: [transform, motion, new GraphicsComponent(), new ActionsComponent()],
             name: "Hit Label",
         });
 
-        this.value = options.value;
+        this.value = options.round
+            ? round(options.value, options.round)
+            : Math.round(options.value);
     }
 
     onInitialize(_engine: Engine): void {

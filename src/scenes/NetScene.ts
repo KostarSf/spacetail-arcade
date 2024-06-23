@@ -2,6 +2,7 @@ import { EmitterType, Engine, ParticleEmitter, Scene, TagQuery, Timer, vec } fro
 import { Asteroid } from "~/actors/Asteroid";
 import { Player } from "~/actors/Player";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
+import { StatsSystem } from "~/ecs/stats.ecs";
 import { Decal } from "~/entities/Decal";
 import { NetSystem } from "~/network/NetSystem";
 import Network from "~/network/Network";
@@ -18,6 +19,8 @@ export class NetScene extends Scene {
     private asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
     private playersQuery!: TagQuery<typeof Player.Tag>;
 
+    private asteroidsDistanceLimit = 1000;
+
     constructor() {
         super();
 
@@ -30,6 +33,7 @@ export class NetScene extends Scene {
 
         this.world.add(NetSystem);
         this.world.add(NetPhysicsSystem);
+        this.world.add(StatsSystem);
 
         const playerPosLimit = 100;
         this.player = new Player({
@@ -66,7 +70,7 @@ export class NetScene extends Scene {
             return;
         }
 
-        const posLimit = 300;
+        const posLimit = this.asteroidsDistanceLimit;
         const velLimit = 10;
 
         const asteroid = new Asteroid({
@@ -81,6 +85,16 @@ export class NetScene extends Scene {
 
     onPostUpdate(engine: Engine<any>, delta: number): void {
         this.graphics.update(engine, delta);
+
+        const limit = this.asteroidsDistanceLimit;
+        this.asteroidsQuery.entities.forEach((asteroid) => {
+            if (
+                Math.abs((asteroid as Asteroid).pos.x) > limit ||
+                Math.abs((asteroid as Asteroid).pos.y) > limit
+            ) {
+                asteroid.kill();
+            }
+        });
 
         const debug =
             `ping: ${Network.ping}ms, ` +
@@ -128,6 +142,17 @@ class SpaceGraphics {
         this.scene.add(this.starsParticles);
 
         this.scene.camera.strategy.radiusAroundActor(this.scene.player, 50);
+        this.scene.player.on("damage", () => {
+            this.scene.camera.shake(5, 5, 100);
+        });
+        this.scene.player.on("postupdate", (evt) => {
+            const player = evt.target as Player;
+
+            if (player.accelerated) {
+                const speed = Math.max(2, player.vel.distance() * 0.003);
+                this.scene.camera.shake(speed, speed, 200);
+            }
+        });
     }
 
     update(engine: Engine, delta: number) {

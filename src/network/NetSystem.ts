@@ -78,7 +78,6 @@ export class NetSystem extends System {
 
         netState.entityActionsEvents.forEach((event) => {
             const actor = this.netActors.get(event.uuid);
-            console.log(actor?.isKilled(), actor);
 
             if (!actor || actor.isKilled()) {
                 return;

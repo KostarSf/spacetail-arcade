@@ -8,6 +8,7 @@ import { ServerPongEvent } from "./ServerPongEvent";
 import { UpdateEntityEvent } from "./UpdateEntityEvent";
 import { DamageAction } from "./actions/DamageAction";
 import { NetAction } from "./actions/NetAction";
+import { StatsChangeAction } from "./actions/StatsChangeAction";
 import { ActionType, EventType } from "./types";
 
 export function registerNetEvents() {
@@ -26,4 +27,5 @@ export function registerNetEvents() {
     NetEvent.register(EventType.EntityAction, EntityActionEvent, EntityActionEvent.parseState);
 
     NetAction.register(ActionType.Damage, DamageAction);
+    NetAction.register(ActionType.StatsChange, StatsChangeAction);
 }

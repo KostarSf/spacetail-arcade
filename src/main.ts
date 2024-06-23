@@ -1,4 +1,4 @@
-import { Color, DisplayMode, Engine } from "excalibur";
+import { Color, DisplayMode, Engine, Keys } from "excalibur";
 import Network from "./network/Network";
 import { registerNetEvents } from "./network/events/registry";
 import { loader } from "./resources";
@@ -25,6 +25,12 @@ class Game extends Engine {
     initialize() {
         registerNetEvents();
         this.start(loader).then(async () => {
+            this.input.keyboard.on("press", (evt) => {
+                if (evt.key === Keys.P) {
+                    this.toggleDebug();
+                }
+            });
+
             await Network.connect();
 
             this.goToScene(NetScene.Key);

@@ -232,7 +232,7 @@ export class GameLevel extends Scene {
                         })
                     );
 
-                    otherPlayer.ship.consumeEnergy(Bullet.energyCost, { force: true });
+                    otherPlayer.ship.consumeEnergy(Bullet.powerCost, { force: true });
                 }
 
                 if (event.action === "accelerated") {

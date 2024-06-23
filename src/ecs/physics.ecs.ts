@@ -17,7 +17,6 @@ import {
 import { Explosion } from "~/entities/Explosion";
 import { NetActor } from "~/network/NetActor";
 import { NetStateComponent } from "~/network/NetStateComponent";
-import { HealthComponent } from "./health.ecs";
 
 export interface NetBodyOptions {
     mass: number;
@@ -84,23 +83,6 @@ export class NetBodyComponent extends Component {
         owner.on("kill", () => {
             const pos = owner.get(TransformComponent).pos;
             owner.scene?.add(new Explosion(pos));
-        });
-
-        owner.on("initialize", () => {
-            const motion = owner.get(MotionComponent)!;
-            const health = owner.get(HealthComponent);
-            const body = owner.get(NetBodyComponent);
-
-            health?.events.on("damage", (evt) => {
-                if (!evt.damager) {
-                    return;
-                }
-
-                motion.vel.addEqual(
-                    evt.damager.vel.normalize().scale((evt.amount * 5) / body.mass)
-                );
-                owner.markStale();
-            });
         });
     }
 }

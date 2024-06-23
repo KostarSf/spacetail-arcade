@@ -6,7 +6,7 @@ import jetstream from "./images/jetstream.png";
 import logo from "./images/logo.png";
 import pirateDamaged from "./images/pirate-damaged.png";
 import pirate from "./images/pirate.png";
-import playerDamaged from "./images/player-broken.png";
+import playerDamaged from "./images/player-damaged.png";
 import player from "./images/player.png";
 import space from "./images/space.png";
 
@@ -79,4 +79,4 @@ loader.playButtonText = "Play";
 loader.logo = logo;
 loader.logoWidth = 256;
 loader.logoHeight = 128;
-loader.suppressPlayButton = false;
+loader.suppressPlayButton = true;

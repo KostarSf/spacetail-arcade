@@ -16,6 +16,7 @@ export enum ReceiverType {
 export enum ActionType {
     ShipFire,
     Damage,
+    StatsChange,
 }
 
 export type SerializableValue =

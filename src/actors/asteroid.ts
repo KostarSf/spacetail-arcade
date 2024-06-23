@@ -1,9 +1,9 @@
 import { CollisionType, Color, Engine, TwoPI, Vector } from "excalibur";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
+import { StatsComponent } from "~/ecs/stats.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
-import { NetAction } from "~/network/events/actions/NetAction";
-import { ActionType, SerializableObject } from "~/network/events/types";
+import { SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
 import { round, vec, vecToArray } from "~/utils/math";
 import { Resources } from "../resources";
@@ -54,8 +54,10 @@ export class Asteroid extends NetActor<AsteroidState> {
             collisionType: CollisionType.Passive,
         });
 
-        this.addComponent(new NetBodyComponent({ mass: options.mass ?? 10 }));
         this.addTag(Asteroid.Tag);
+
+        this.addComponent(new StatsComponent({ health: 50, power: 0 }));
+        this.addComponent(new NetBodyComponent({ mass: options.mass ?? 10 }));
 
         this.radius = radius;
     }
@@ -77,16 +79,11 @@ export class Asteroid extends NetActor<AsteroidState> {
         });
     }
 
-    onPostUpdate(_engine: Engine<any>, _delta: number): void {
-        const tint = this.isReplica ? Color.Orange : Color.DarkGray;
+    onPostUpdate(engine: Engine<any>, _delta: number): void {
+        const tint = engine.isDebug && this.isReplica ? Color.Orange : Color.DarkGray;
 
         if (this.graphics.current && this.graphics.current.tint !== tint) {
             this.graphics.current.tint = tint;
-        }
-
-        const limit = 500;
-        if (Math.abs(this.pos.x) > limit || Math.abs(this.pos.y) > limit) {
-            this.kill();
         }
     }
 
@@ -112,12 +109,5 @@ export class Asteroid extends NetActor<AsteroidState> {
         this.rotation += newRotation + (newRotation < 0 ? TwoPI : 0);
         this.pos.addEqual(this.vel.scale(delta));
         this.netBody.mass = state.mass;
-    }
-
-    protected receiveAction(action: NetAction, _latency: number): void {
-        switch (action.type) {
-            case ActionType.Damage:
-                this.kill();
-        }
     }
 }
