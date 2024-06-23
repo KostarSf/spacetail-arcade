@@ -11,7 +11,7 @@ import {
 } from "excalibur";
 import { ActorEvents } from "excalibur/build/dist/Actor";
 import { DamageEvent, StatsComponent } from "~/ecs/stats.ecs";
-import { Explosion } from "~/entities/Explosion";
+import { Explosion } from "~/entities/.Explosion";
 import { HitLabel } from "~/entities/HitLabel";
 import { DamageAction } from "./events/actions/DamageAction";
 import { NetAction } from "./events/actions/NetAction";

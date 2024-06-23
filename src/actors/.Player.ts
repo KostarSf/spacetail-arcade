@@ -20,7 +20,7 @@ import { SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
 import { Animations, Resources } from "~/resources";
 import { round, vecToArray } from "~/utils/math";
-import { Bullet } from "./Bullet";
+import { Bullet } from "./.Bullet";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
