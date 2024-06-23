@@ -14,7 +14,7 @@ import {
     Vector,
     World,
 } from "excalibur";
-import { Explosion } from "~/entities/.Explosion";
+import { Explosion } from "~/entities/Explosion";
 import { WorldBorder } from "~/entities/WorldBorder";
 import { DamageAction } from "~/network/events/actions/DamageAction";
 import { NetActor } from "~/network/NetActor";
