@@ -5,7 +5,6 @@ import {
     CollisionGroupManager,
     CollisionType,
     Color,
-    Direction,
     Engine,
     Font,
     GraphicsGroup,
@@ -19,6 +18,7 @@ import {
     vec,
 } from "excalibur";
 import { v4 } from "uuid";
+import { Pallete } from "~/constants";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { StatsComponent } from "~/ecs/stats.ecs";
 import { ResourceLine } from "~/graphics/ResourceLine";
@@ -30,7 +30,6 @@ import { Animations, Resources } from "~/resources";
 import { easeOut, lerp, linear, round, vecToArray } from "~/utils/math";
 import { Bullet } from "./Bullet";
 import { XpOrb } from "./XpOrb";
-import { Pallete } from "~/constants";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
