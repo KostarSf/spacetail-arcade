@@ -1,9 +1,11 @@
-import { CollisionType, Vector, vec } from "excalibur";
+import { CollisionType, Engine, Vector, vec } from "excalibur";
+import { Debree } from "~/entities/Debree";
+import { drawGlare } from "~/graphics/Glare";
 import { NetActor } from "~/network/NetActor";
 import { DamageAction } from "~/network/events/actions/DamageAction";
 import { ReceiverType, SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
-import { round, vecToArray } from "~/utils/math";
+import { rand, round, vecToArray } from "~/utils/math";
 import { Animations } from "../resources";
 import { XpOrb } from "./XpOrb";
 
@@ -65,7 +67,7 @@ export class Bullet extends NetActor<BulletState> {
         this.armorDeflection = options.armorDeflection ?? 1;
     }
 
-    onInitialize(): void {
+    onInitialize(engine: Engine): void {
         const animation = Animations.Bullet;
         animation.scale.setTo(1.5, 1.1);
 
@@ -80,6 +82,28 @@ export class Bullet extends NetActor<BulletState> {
                 other.hasTag(XpOrb.Tag)
             ) {
                 return;
+            }
+
+            if (this.scene) {
+                Debree.emit({
+                    scene: this.scene,
+                    pos: this.pos,
+                    posSpread: 5,
+                    vel: other.vel.sub(this.vel.negate().normalize().scale(50)),
+                    speedSpread: 1.2,
+                    angleSpread: Math.PI * 0.5,
+                    size: 1.5,
+                    sizeSpread: 0.5,
+                    timeToLive: 1000,
+                    timeToLiveSpread: 500,
+                    amount: rand.integer(10, 15),
+                    blinkDelta: 0.2,
+                    blinkDeltaSpread: 0.1,
+                    blinkSpeed: 200,
+                    blinkSpeedSpread: 50,
+                    opacity: 0.8,
+                    opacitySpread: 0.2,
+                });
             }
 
             if (!this.isReplica) {
@@ -97,7 +121,35 @@ export class Bullet extends NetActor<BulletState> {
             }
         });
 
+        this.on("postdraw", (evt) => {
+            drawGlare(evt.ctx, this, engine.currentScene.camera, 1, 5);
+        });
+
         this.actions.delay(5000).die();
+    }
+
+    onPostUpdate(engine: Engine, _delta: number): void {
+        if (0.2 < rand.next()) {
+            return;
+        }
+
+        Debree.emit({
+            scene: engine.currentScene,
+            size: 1.2,
+            sizeSpread: 0.7,
+            pos: this.pos,
+            vel: this.vel.scale(0.5),
+            speedSpread: 0.3,
+            angleSpread: 0.06,
+            opacity: 0.8,
+            opacitySpread: 0.2,
+            timeToLive: 1500,
+            timeToLiveSpread: 500,
+            blinkSpeed: 300,
+            blinkSpeedSpread: 100,
+            blinkDelta: 0.1,
+            blinkDeltaSpread: 0.2,
+        });
     }
 
     public serializeState(): BulletState {

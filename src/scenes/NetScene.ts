@@ -195,8 +195,10 @@ class SpaceGraphics {
 
         if (this.scene.player) {
             this.scene.camera.strategy.radiusAroundActor(this.scene.player, 50);
-            this.scene.player.on("damage", () => {
-                this.scene.camera.shake(5, 5, 100);
+            this.scene.player.on("damage", (evt) => {
+                if (evt.amount > 0) {
+                    this.scene.camera.shake(5, 5, 100);
+                }
             });
             this.scene.player.on("postupdate", (evt) => {
                 const player = evt.target as Player;

@@ -16,7 +16,12 @@ import { NetActor } from "~/network/NetActor";
 import { NetStateComponent } from "~/network/NetStateComponent";
 
 export class DamageEvent<T extends StatsComponentOptions | Entity = Actor> extends GameEvent<T> {
-    constructor(target: T, public amount: number, public direction: number | null) {
+    constructor(
+        target: T,
+        public amount: number,
+        public consumed: number,
+        public direction: number | null
+    ) {
         super();
         this.target = target;
     }
@@ -86,7 +91,7 @@ export class StatsComponent extends Component {
         this.events.on("damage", (evt) => {
             owner.events.emit(
                 "damage",
-                new DamageEvent(evt.target.owner!, evt.amount, evt.direction)
+                new DamageEvent(evt.target.owner!, evt.amount, evt.consumed, evt.direction)
             );
         });
     }
@@ -108,18 +113,21 @@ export class StatsComponent extends Component {
         }
 
         let damageAfterArmor = damage;
+        let damageConsumed = 0;
 
         if (this.power > 0) {
             const damageOnArmor = (damage * armorDeflection) / this.armorResistance;
             const powerAfterDamage = this.power - damageOnArmor;
 
+            damageAfterArmor = 0 - powerAfterDamage;
+            damageConsumed = damageOnArmor - Math.max(0, damageAfterArmor);
+
             this.power = powerAfterDamage;
             this.isStale = true;
-
-            damageAfterArmor = 0 - powerAfterDamage;
         }
 
         if (damageAfterArmor <= 0) {
+            this.events.emit("damage", new DamageEvent(this, 0, damageConsumed, direction));
             return 0;
         }
 
@@ -129,7 +137,10 @@ export class StatsComponent extends Component {
         this.health = healthAfterDamage;
         this.isStale = true;
 
-        this.events.emit("damage", new DamageEvent(this, damageOnHealth, direction));
+        this.events.emit(
+            "damage",
+            new DamageEvent(this, damageOnHealth, damageConsumed, direction)
+        );
 
         return damageOnHealth;
     }

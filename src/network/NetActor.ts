@@ -10,6 +10,7 @@ import {
     Vector,
 } from "excalibur";
 import { ActorEvents } from "excalibur/build/dist/Actor";
+import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { DamageEvent, StatsComponent } from "~/ecs/stats.ecs";
 import { Explosion } from "~/entities/Explosion";
 import { HitLabel } from "~/entities/HitLabel";
@@ -24,7 +25,6 @@ import { UpdateEntityEvent } from "./events/UpdateEntityEvent";
 import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
 import { ActorType } from "./types";
-import { NetBodyComponent } from "~/ecs/physics.ecs";
 
 export type NetActorEvents = ActorEvents & {
     action: ActionEvent;

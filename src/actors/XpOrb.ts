@@ -1,5 +1,7 @@
 import { CollisionType, Color, Engine, Scene, TwoPI, vec, Vector } from "excalibur";
+import { Pallete } from "~/constants";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
+import { drawGlare } from "~/graphics/Glare";
 import { SerializableObject } from "~/network/events/types";
 import { NetActor } from "~/network/NetActor";
 import { ActorType, SerializedVector } from "~/network/types";
@@ -51,7 +53,6 @@ export class XpOrb extends NetActor<XpOrbState> {
 
             width: 5,
             height: 5,
-            color: Color.White,
             collisionType: CollisionType.Passive,
 
             scale: Vector.One.scaleEqual(initialScale),
@@ -71,15 +72,36 @@ export class XpOrb extends NetActor<XpOrbState> {
         this.blinking = false;
     }
 
-    onInitialize(_engine: Engine): void {}
+    onInitialize(engine: Engine): void {
+        const square = vec(-3, -3);
+
+        const smallSquare = vec(-1, -1);
+        const largeSquare = vec(-2, -2);
+        this.on("postdraw", (evt) => {
+            drawGlare(evt.ctx, this, engine.currentScene.camera, 6, 4);
+
+            evt.ctx.drawRectangle(square, 6, 6, Color.White);
+
+            if (this.amount >= 25) {
+                const large = this.amount >= 100;
+                const size = large ? 4 : 2;
+                evt.ctx.drawRectangle(
+                    large ? largeSquare : smallSquare,
+                    size,
+                    size,
+                    Pallete.gray900
+                );
+            }
+        });
+    }
 
     onPostUpdate(_engine: Engine, delta: number): void {
         this.timeRemain -= delta;
-
         delta = delta / 1000;
 
+        const scaleBase = this.amount < 10 ? 0.3 : this.amount < 50 ? 0.6 : 1;
         const scale =
-            0.4 +
+            scaleBase +
             lerp(this.timeRemain, 0, this.timeToDie, easeInOut) *
                 Math.max(0.4, this.initialScale - 0.4);
         this.scale.setTo(scale, scale);

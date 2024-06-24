@@ -51,7 +51,7 @@ export class HitLabel extends Entity {
         this.get(GraphicsComponent).use(
             new Text({
                 text: `${isHeal ? "+" : ""}${this.value}`,
-                color: isHeal ? Color.White : Pallete.gray400,
+                color: isHeal ? Color.White : Pallete.gray100,
                 font: new Font({
                     family: "monospace",
                     filtering: ImageFiltering.Pixel,

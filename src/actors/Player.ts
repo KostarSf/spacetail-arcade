@@ -12,6 +12,7 @@ import {
     Label,
     PointerButton,
     PolygonCollider,
+    Sprite,
     TextAlign,
     TwoPI,
     Vector,
@@ -27,9 +28,10 @@ import { NetActor } from "~/network/NetActor";
 import { SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
 import { Animations, Resources } from "~/resources";
-import { easeOut, lerp, linear, round, vecToArray } from "~/utils/math";
+import { easeOut, lerp, linear, rand, round, vecToArray } from "~/utils/math";
 import { Bullet } from "./Bullet";
 import { XpOrb } from "./XpOrb";
+import { Debree } from "~/entities/Debree";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
@@ -58,9 +60,11 @@ export class Player extends NetActor<PlayerState> {
 
     private shipSprite!: ShadowedSprite;
     private jetGraphics!: Animation;
+    private shieldSprite!: Sprite;
 
     private mouseControll = false;
     private collisionGroup: CollisionGroup;
+    private shieldOpacity = 0;
 
     constructor(options?: PlayerOptions) {
         const collisionGroup = CollisionGroupManager.create(v4());
@@ -98,12 +102,21 @@ export class Player extends NetActor<PlayerState> {
             this.isReplica ? Pallete.gray200 : undefined
         );
         this.jetGraphics = Animations.JetStream;
+        this.shieldSprite = this.isReplica
+            ? Resources.PirateShield.toSprite()
+            : Resources.PlayerShield.toSprite();
 
-        this.graphics.add(
-            new GraphicsGroup({
-                members: [
-                    { graphic: this.shipSprite, offset: Vector.Zero },
-                    { graphic: this.jetGraphics, offset: Vector.Zero },
+        const graphicsGroup = new GraphicsGroup({
+            members: [
+                { graphic: this.shieldSprite, offset: Vector.Zero },
+                { graphic: this.shipSprite, offset: Vector.Zero },
+                { graphic: this.jetGraphics, offset: Vector.Zero },
+            ],
+        });
+
+        if (!this.isReplica) {
+            graphicsGroup.members.push(
+                ...[
                     {
                         graphic: new ResourceLine({
                             pos: vec(26, 0),
@@ -148,9 +161,11 @@ export class Player extends NetActor<PlayerState> {
                         offset: vec(16, 0),
                         useBounds: false,
                     },
-                ],
-            })
-        );
+                ]
+            );
+        }
+
+        this.graphics.add(graphicsGroup);
 
         this.on("collisionstart", (evt) => {
             if (evt.other.hasTag(XpOrb.Tag)) {
@@ -164,7 +179,7 @@ export class Player extends NetActor<PlayerState> {
         });
 
         const gathererSize = 80;
-        const gatherPower =  10
+        const gatherPower = 10;
         const xpOrbGatherer = new Actor({
             pos: this.pos,
             radius: gathererSize,
@@ -215,6 +230,34 @@ export class Player extends NetActor<PlayerState> {
         engine.currentScene.add(xpOrbGatherer);
         engine.currentScene.add(xpLabel);
 
+        this.on("damage", (evt) => {
+            if (evt.consumed >= 0) {
+                this.shieldOpacity = evt.amount > 0 ? 0.5 : 1;
+            }
+
+            if (evt.amount > 0 && this.scene) {
+                Debree.emit({
+                    scene: this.scene,
+                    pos: this.pos,
+                    posSpread: 5,
+                    vel: Vector.One.scale(20),
+                    speedSpread: 1.5,
+                    angleSpread: TwoPI,
+                    size: 2,
+                    sizeSpread: 1,
+                    timeToLive: 2000,
+                    timeToLiveSpread: 1000,
+                    amount: rand.integer(10, 20),
+                    blinkDelta: 0.2,
+                    blinkDeltaSpread: 0.1,
+                    blinkSpeed: 400,
+                    blinkSpeedSpread: 200,
+                    opacity: 0.9,
+                    opacitySpread: 0.1,
+                });
+            }
+        });
+
         this.on("kill", () => {
             xpOrbGatherer.kill();
             xpLabel.kill();
@@ -223,13 +266,14 @@ export class Player extends NetActor<PlayerState> {
                 return;
             }
 
-            const xpDropped = Math.round(this.xp / 4);
+            const xpDropped = Math.round(this.xp / 3);
 
             if (xpDropped < 1) {
                 return;
             }
 
-            const orbsCount = 1 + Math.round(lerp(xpDropped, 1, 1000, linear) * 29);
+            const orbsCount =
+                1 + Math.round(lerp(xpDropped, 1, 200, linear) * rand.integer(29, 49));
             const xpPerOrb = Math.max(1, Math.round(xpDropped / orbsCount));
 
             const values = new Array(orbsCount).fill(xpPerOrb);
@@ -325,6 +369,12 @@ export class Player extends NetActor<PlayerState> {
     onPostUpdate(engine: Engine<any>, delta: number): void {
         delta = delta / 1000;
 
+        this.shieldSprite.opacity = this.shieldOpacity;
+
+        if (this.shieldOpacity > 0) {
+            this.shieldOpacity = Math.max(0, this.shieldOpacity - 2 * delta);
+        }
+
         if (!this.isReplica) {
             let newRotation = this.rotation;
 
@@ -350,13 +400,19 @@ export class Player extends NetActor<PlayerState> {
             }
         }
 
-        if (this.stats.health > this.stats.maxHealth * 0.3) {
+        if (this.stats.health > this.stats.maxHealth * 0.6) {
             this.shipSprite.image = this.isReplica ? Resources.Pirate : Resources.Player;
+        } else if (this.stats.health > this.stats.maxHealth * 0.3) {
+            this.shipSprite.image = this.isReplica
+                ? Resources.PirateDamaged1
+                : Resources.PlayerDamaged1;
         } else {
             this.shipSprite.image = this.isReplica
-                ? Resources.PirateDamaged
-                : Resources.PlayerDamaged;
+                ? Resources.PirateDamaged2
+                : Resources.PlayerDamaged2;
         }
+
+        this.shieldSprite.image = this.isReplica ? Resources.PirateShield : Resources.PlayerShield;
 
         this.vel = this.applyMovement(delta);
 

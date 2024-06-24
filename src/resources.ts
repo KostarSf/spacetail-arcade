@@ -11,18 +11,26 @@ import bullet from "./images/bullet.png";
 import explosion from "./images/explosion.png";
 import jetstream from "./images/jetstream.png";
 import logo from "./images/logo.png";
-import pirateDamaged from "./images/pirate-damaged.png";
+import pirateDamaged1 from "./images/pirate-damaged-1.png";
+import pirateDamaged2 from "./images/pirate-damaged-2.png";
+import pirateShield from "./images/pirate-shield.png";
 import pirate from "./images/pirate.png";
-import playerDamaged from "./images/player-damaged.png";
+import playerDamaged1 from "./images/player-damaged-1.png";
+import playerDamaged2 from "./images/player-damaged-2.png";
+import playerShield from "./images/player-shield.png";
 import player from "./images/player.png";
 import space from "./images/space.png";
 
 export const Resources = {
     Player: new ImageSource(player),
-    PlayerDamaged: new ImageSource(playerDamaged),
+    PlayerDamaged1: new ImageSource(playerDamaged1),
+    PlayerDamaged2: new ImageSource(playerDamaged2),
+    PlayerShield: new ImageSource(playerShield),
 
     Pirate: new ImageSource(pirate),
-    PirateDamaged: new ImageSource(pirateDamaged),
+    PirateDamaged1: new ImageSource(pirateDamaged1),
+    PirateDamaged2: new ImageSource(pirateDamaged2),
+    PirateShield: new ImageSource(pirateShield),
 
     AsteroidSmall1: new ImageSource(asteroidSmall1),
     AsteroidSmall2: new ImageSource(asteroidSmall2),

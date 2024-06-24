@@ -8,6 +8,7 @@ import { ActorType, SerializedVector } from "~/network/types";
 import { rand, vec, vecToArray } from "~/utils/math";
 import { Resources } from "../resources";
 import { XpOrb } from "./XpOrb";
+import { Debree } from "~/entities/Debree";
 
 export enum AsteroidType {
     Small,
@@ -89,6 +90,28 @@ export class Asteroid extends NetActor<AsteroidState> {
         });
 
         this.on("kill", () => {
+            if (this.scene && !this.isKilled()) {
+                Debree.emit({
+                    scene: this.scene,
+                    pos: this.pos,
+                    posSpread: this.asteroidCollider.radius * 0.8,
+                    vel: Vector.One.scale(50),
+                    speedSpread: 1.9,
+                    angleSpread: TwoPI,
+                    size: 2,
+                    sizeSpread: 1,
+                    timeToLive: 1500,
+                    timeToLiveSpread: 1000,
+                    amount: rand.integer(10, 20),
+                    opacity: 0.9,
+                    opacitySpread: 0.2,
+                    blinkDelta: 0.1,
+                    blinkDeltaSpread: 0.05,
+                    blinkSpeed: 200,
+                    blinkSpeedSpread: 100,
+                });
+            }
+
             if (!this.scene || this.isReplica || this.isKilled()) {
                 return;
             }
@@ -110,12 +133,13 @@ export class Asteroid extends NetActor<AsteroidState> {
             }
         });
 
-        this.on("damage", () => {
+        this.on("damage", (evt) => {
             if (
                 !this.scene ||
                 this.isReplica ||
                 this.isKilled() ||
-                this.asteroidType === AsteroidType.Item
+                this.asteroidType === AsteroidType.Item ||
+                evt.amount <= 0
             ) {
                 return;
             }
