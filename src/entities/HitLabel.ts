@@ -12,6 +12,7 @@ import {
     Vector,
     vec,
 } from "excalibur";
+import { Pallete } from "~/constants";
 import { linInt, round } from "~/utils/math";
 
 export interface HitLabelOptions {
@@ -50,7 +51,7 @@ export class HitLabel extends Entity {
         this.get(GraphicsComponent).use(
             new Text({
                 text: `${isHeal ? "+" : ""}${this.value}`,
-                color: isHeal ? Color.Green : Color.Yellow,
+                color: isHeal ? Color.White : Pallete.gray400,
                 font: new Font({
                     family: "monospace",
                     filtering: ImageFiltering.Pixel,

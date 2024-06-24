@@ -13,6 +13,7 @@ import {
 } from "excalibur";
 import { Asteroid } from "~/actors/Asteroid";
 import { Player } from "~/actors/Player";
+import { Pallete } from "~/constants";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
 import { StatsSystem } from "~/ecs/stats.ecs";
 import { Decal } from "~/entities/Decal";
@@ -243,7 +244,7 @@ class SpaceGraphics {
                 linInt(transform.pos.y, -worldSize, worldSize, 0, mapSize - 2)
             ).addEqual(offset);
 
-            ctx.drawRectangle(pos, 4, 4, Color.Red);
+            ctx.drawRectangle(pos, 4, 4, Pallete.gray400);
         });
 
         pos = vec(
@@ -251,7 +252,7 @@ class SpaceGraphics {
             linInt(player.pos.y, -worldSize, worldSize, 0, mapSize - 2)
         ).addEqual(offset);
 
-        ctx.drawRectangle(pos, 2, 2, Color.Cyan);
+        ctx.drawRectangle(pos, 2, 2, Color.White);
     }
 
     private updateCamera(engine: Engine, delta: number, player: Player) {

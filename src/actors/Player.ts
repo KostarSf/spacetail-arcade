@@ -5,12 +5,15 @@ import {
     CollisionGroupManager,
     CollisionType,
     Color,
+    Direction,
     Engine,
+    Font,
     GraphicsGroup,
     Keys,
     Label,
     PointerButton,
     PolygonCollider,
+    TextAlign,
     TwoPI,
     Vector,
     vec,
@@ -27,6 +30,7 @@ import { Animations, Resources } from "~/resources";
 import { easeOut, lerp, linear, round, vecToArray } from "~/utils/math";
 import { Bullet } from "./Bullet";
 import { XpOrb } from "./XpOrb";
+import { Pallete } from "~/constants";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
@@ -92,7 +96,7 @@ export class Player extends NetActor<PlayerState> {
     onInitialize(engine: Engine<any>): void {
         this.shipSprite = ShadowedSprite.from(
             this.isReplica ? Resources.Pirate : Resources.Player,
-            this.isReplica ? Color.fromHex("#aaaaaa") : undefined
+            this.isReplica ? Pallete.gray200 : undefined
         );
         this.jetGraphics = Animations.JetStream;
 
@@ -107,7 +111,7 @@ export class Player extends NetActor<PlayerState> {
                             lineWidth: 32,
                             color: () => {
                                 const lowEnergy = this.stats.power < Bullet.powerCost;
-                                return lowEnergy ? Color.Red : Color.Cyan;
+                                return lowEnergy ? Pallete.gray600 : Pallete.gray100;
                             },
                             minValue: 0,
                             maxValue: this.stats.maxPower,
@@ -124,18 +128,18 @@ export class Player extends NetActor<PlayerState> {
                             lineWidth: 32,
                             color: () => {
                                 if (this.isReplica) {
-                                    return Color.Red;
+                                    return Pallete.gray400;
                                 }
 
                                 if (this.stats.health > this.stats.maxHealth * 0.6) {
-                                    return Color.Green;
+                                    return Color.White;
                                 }
 
                                 if (this.stats.health > this.stats.maxHealth * 0.3) {
-                                    return Color.Yellow;
+                                    return Pallete.gray200;
                                 }
 
-                                return Color.Red;
+                                return Pallete.gray400;
                             },
                             minValue: 0,
                             maxValue: this.stats.maxHealth,
@@ -198,7 +202,11 @@ export class Player extends NetActor<PlayerState> {
             xpOrb.markStale();
         });
 
-        const xpLabel = new Label({ color: Color.Yellow, pos: this.pos });
+        const xpLabel = new Label({
+            color: Pallete.gray200,
+            pos: this.pos,
+            font: new Font({ textAlign: TextAlign.Center, family: "monospace" }),
+        });
         xpLabel.on("postupdate", () => {
             xpLabel.pos = this.pos.add(vec(0, 15));
             xpLabel.text = this.xp.toFixed();
