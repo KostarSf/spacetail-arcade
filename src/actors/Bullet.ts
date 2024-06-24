@@ -5,6 +5,7 @@ import { ReceiverType, SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
 import { round, vecToArray } from "~/utils/math";
 import { Animations } from "../resources";
+import { XpOrb } from "./XpOrb";
 
 export interface BulletState extends SerializableObject {
     shooter: string | null;
@@ -73,7 +74,11 @@ export class Bullet extends NetActor<BulletState> {
         this.on("collisionstart", (evt) => {
             const other = evt.other;
 
-            if (this.shooter === evt.other || !(other instanceof NetActor)) {
+            if (
+                this.shooter === evt.other ||
+                !(other instanceof NetActor) ||
+                other.hasTag(XpOrb.Tag)
+            ) {
                 return;
             }
 

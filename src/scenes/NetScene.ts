@@ -189,7 +189,7 @@ class SpaceGraphics {
     }
 
     draw(ctx: ExcaliburGraphicsContext, _delta: number): void {
-        if (!this.scene.player) {
+        if (!this.scene.player || !this.scene.player.active) {
             return;
         }
 

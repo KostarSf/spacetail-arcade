@@ -114,6 +114,7 @@ export class StatsComponent extends Component {
             const powerAfterDamage = this.power - damageOnArmor;
 
             this.power = powerAfterDamage;
+            this.isStale = true;
 
             damageAfterArmor = 0 - powerAfterDamage;
         }

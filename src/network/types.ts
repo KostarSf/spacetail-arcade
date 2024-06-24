@@ -4,4 +4,5 @@ export enum ActorType {
     Player,
     Bullet,
     Asteroid,
+    XpOrb,
 }

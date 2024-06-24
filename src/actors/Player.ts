@@ -1,16 +1,21 @@
 import {
+    Actor,
     Animation,
+    CollisionGroup,
+    CollisionGroupManager,
     CollisionType,
     Color,
     Engine,
     GraphicsGroup,
     Keys,
+    Label,
     PointerButton,
     PolygonCollider,
     TwoPI,
     Vector,
     vec,
 } from "excalibur";
+import { v4 } from "uuid";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { StatsComponent } from "~/ecs/stats.ecs";
 import { ResourceLine } from "~/graphics/ResourceLine";
@@ -19,8 +24,9 @@ import { NetActor } from "~/network/NetActor";
 import { SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
 import { Animations, Resources } from "~/resources";
-import { round, vecToArray } from "~/utils/math";
+import { easeOut, lerp, linear, round, vecToArray } from "~/utils/math";
 import { Bullet } from "./Bullet";
+import { XpOrb } from "./XpOrb";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
@@ -29,6 +35,7 @@ export interface PlayerState extends SerializableObject {
     rotation: number;
     health: number;
     power: number;
+    xp: number;
 }
 
 export interface PlayerOptions {
@@ -44,13 +51,17 @@ export class Player extends NetActor<PlayerState> {
     public readonly type: ActorType = ActorType.Player;
 
     public accelerated = false;
+    public xp = 0;
 
     private shipSprite!: ShadowedSprite;
     private jetGraphics!: Animation;
 
     private mouseControll = false;
+    private collisionGroup: CollisionGroup;
 
     constructor(options?: PlayerOptions) {
+        const collisionGroup = CollisionGroupManager.create(v4());
+
         super({
             name: "Player",
             uuid: options?.uuid,
@@ -61,6 +72,7 @@ export class Player extends NetActor<PlayerState> {
                 points: [vec(-10, -10), vec(15, 0), vec(-10, 10)],
             }),
             collisionType: CollisionType.Passive,
+            collisionGroup: collisionGroup,
         });
 
         this.addTag(Player.Tag);
@@ -69,6 +81,8 @@ export class Player extends NetActor<PlayerState> {
             new StatsComponent({ health: 50, power: 25, powerRecoverySpeed: 10, hardness: 10 })
         );
         this.addComponent(new NetBodyComponent({ mass: 10 }));
+
+        this.collisionGroup = collisionGroup;
     }
 
     get stats() {
@@ -134,6 +148,86 @@ export class Player extends NetActor<PlayerState> {
                 ],
             })
         );
+
+        this.on("collisionstart", (evt) => {
+            if (evt.other.hasTag(XpOrb.Tag)) {
+                if (!this.isReplica) {
+                    this.xp += (evt.other as XpOrb).amount;
+                    this.markStale();
+                }
+
+                evt.other.kill();
+            }
+        });
+
+        const gathererSize = 128;
+        const xpOrbGatherer = new Actor({
+            pos: this.pos,
+            radius: gathererSize,
+            collisionGroup: this.collisionGroup,
+        });
+        xpOrbGatherer.on("postupdate", () => {
+            xpOrbGatherer.pos = this.pos;
+        });
+        xpOrbGatherer.on("precollision", (event) => {
+            if (!event.other.hasTag(XpOrb.Tag)) {
+                return;
+            }
+
+            const xpOrb = event.other as XpOrb;
+            const koeff = 1 - lerp(this.pos.distance(xpOrb.pos), 0, gathererSize, easeOut);
+            const force = this.pos
+                .sub(xpOrb.pos)
+                .normalize()
+                .scale(15 * koeff);
+
+            xpOrb.vel.addEqual(force);
+        });
+        xpOrbGatherer.on("collisionstart", (event) => {
+            if (!event.other.hasTag(XpOrb.Tag)) {
+                return;
+            }
+            const xpOrb = event.other as XpOrb;
+            xpOrb.markStale();
+        });
+        xpOrbGatherer.on("collisionend", (event) => {
+            if (!event.other.hasTag(XpOrb.Tag)) {
+                return;
+            }
+            const xpOrb = event.other as XpOrb;
+            xpOrb.markStale();
+        });
+
+        const xpLabel = new Label({ color: Color.Yellow, pos: this.pos });
+        xpLabel.on("postupdate", () => {
+            xpLabel.pos = this.pos.add(vec(0, 15));
+            xpLabel.text = this.xp.toFixed();
+        });
+
+        engine.currentScene.add(xpOrbGatherer);
+        engine.currentScene.add(xpLabel);
+
+        this.on("kill", () => {
+            xpOrbGatherer.kill();
+            xpLabel.kill();
+
+            if (this.isReplica || this.isKilled() || !this.scene) {
+                return;
+            }
+
+            const xpDropped = Math.round(this.xp / 4);
+
+            if (xpDropped < 1) {
+                return;
+            }
+
+            const orbsCount = 1 + Math.round(lerp(xpDropped, 1, 1000, linear) * 29);
+            const xpPerOrb = Math.max(1, Math.round(xpDropped / orbsCount));
+
+            const values = new Array(orbsCount).fill(xpPerOrb);
+
+            XpOrb.spawn(this.scene, values, this.pos, this.vel);
+        });
 
         if (this.isReplica) {
             return;
@@ -214,7 +308,7 @@ export class Player extends NetActor<PlayerState> {
             vel,
             rotation: this.rotation,
 
-            damage: 10,
+            damage: 15,
             armorDeflection: 1.5,
         });
         this.scene?.add(bullet);
@@ -278,6 +372,7 @@ export class Player extends NetActor<PlayerState> {
             accelerated: this.accelerated,
             health: this.stats.health,
             power: this.stats.power,
+            xp: this.xp,
         };
     }
 
@@ -286,9 +381,9 @@ export class Player extends NetActor<PlayerState> {
         this.vel = vec(...state.vel);
         this.rotation = state.rotation;
         this.accelerated = state.accelerated;
-
         this.stats.health = state.health;
         this.stats.power = state.power;
+        this.xp = state.xp;
 
         const delta = latency / 1000;
 

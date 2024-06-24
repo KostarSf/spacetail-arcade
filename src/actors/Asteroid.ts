@@ -5,8 +5,9 @@ import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
 import { SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
-import { round, vec, vecToArray } from "~/utils/math";
+import { rand, round, vec, vecToArray } from "~/utils/math";
 import { Resources } from "../resources";
+import { XpOrb } from "./XpOrb";
 
 export interface AsteroidState extends SerializableObject {
     pos: SerializedVector;
@@ -14,6 +15,7 @@ export interface AsteroidState extends SerializableObject {
     rotation: number;
     angularVelocity: number;
     mass: number;
+    health: number;
 }
 
 export interface AsteroidOptions {
@@ -36,6 +38,10 @@ export class Asteroid extends NetActor<AsteroidState> {
 
     get netBody() {
         return this.get(NetBodyComponent);
+    }
+
+    get stats() {
+        return this.get(StatsComponent);
     }
 
     constructor(options: AsteroidOptions = {}) {
@@ -77,6 +83,33 @@ export class Asteroid extends NetActor<AsteroidState> {
                 }
             }
         });
+
+        this.on("kill", () => {
+            if (!this.scene || this.isReplica || this.isKilled()) {
+                return;
+            }
+
+            const count = rand.integer(2, 4);
+            const values = new Array(count).fill(0).map(() => rand.integer(2, 4));
+
+            XpOrb.spawn(this.scene, values, this.pos, this.vel);
+        });
+
+        this.on("damage", () => {
+            if (!this.scene || this.isReplica || this.isKilled()) {
+                return;
+            }
+
+            const chance = rand.floating(0, 1);
+            if (chance > 0.3) {
+                return;
+            }
+
+            const count = rand.integer(0, 2);
+            const values = new Array(count).fill(1);
+
+            XpOrb.spawn(this.scene, values, this.pos, this.vel);
+        });
     }
 
     onPostUpdate(engine: Engine<any>, _delta: number): void {
@@ -94,6 +127,7 @@ export class Asteroid extends NetActor<AsteroidState> {
             rotation: round(this.rotation, 2),
             angularVelocity: round(this.angularVelocity, 2),
             mass: this.netBody.mass,
+            health: this.stats.health,
         };
     }
 
@@ -102,6 +136,8 @@ export class Asteroid extends NetActor<AsteroidState> {
         this.vel = vec(...state.vel);
         this.rotation = state.rotation;
         this.angularVelocity = state.angularVelocity;
+
+        this.stats.health = state.health;
 
         const delta = latency / 1000;
 

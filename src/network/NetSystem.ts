@@ -7,6 +7,7 @@ import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
 import { EntityWithStateEvent } from "./events/EntityWithStateEvent";
 import { ActorType } from "./types";
+import { XpOrb } from "~/actors/XpOrb";
 
 export class NetSystem extends System {
     systemType: SystemType = SystemType.Update;
@@ -125,3 +126,4 @@ export class NetSystem extends System {
 NetSystem.registerActor(ActorType.Player, Player);
 NetSystem.registerActor(ActorType.Asteroid, Asteroid);
 NetSystem.registerActor(ActorType.Bullet, Bullet);
+NetSystem.registerActor(ActorType.XpOrb, XpOrb);

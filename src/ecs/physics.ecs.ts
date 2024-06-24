@@ -14,13 +14,14 @@ import {
     Vector,
     World,
 } from "excalibur";
+import { XpOrb } from "~/actors/XpOrb";
 import { Explosion } from "~/entities/Explosion";
 import { WorldBorder } from "~/entities/WorldBorder";
 import { DamageAction } from "~/network/events/actions/DamageAction";
+import { ReceiverType } from "~/network/events/types";
 import { NetActor } from "~/network/NetActor";
 import { NetStateComponent } from "~/network/NetStateComponent";
 import { StatsComponent } from "./stats.ecs";
-import { ReceiverType } from "~/network/events/types";
 
 export interface NetBodyOptions {
     mass: number;
@@ -96,6 +97,10 @@ export class NetBodyComponent extends Component {
             const impulse = collisionNormal.scale(impulseScalar);
             thisBody.nextVel = thisBody.vel.sub(impulse.scale(1 / thisBody.mass));
 
+            if (target.hasTag(XpOrb.Tag) || other.hasTag(XpOrb.Tag)) {
+                return;
+            }
+
             if (!target.isReplica) {
                 const threshhold = Math.max(0, relativeVelocity.distance() - 50);
                 if (threshhold > 0 && target.has(StatsComponent)) {
@@ -122,6 +127,10 @@ export class NetBodyComponent extends Component {
         });
 
         owner.on("kill", () => {
+            if (owner.hasTag(XpOrb.Tag)) {
+                return;
+            }
+
             const pos = owner.get(TransformComponent).pos;
             owner.scene?.add(new Explosion(pos));
         });
