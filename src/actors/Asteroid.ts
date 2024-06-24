@@ -1,21 +1,27 @@
-import { CollisionType, Color, Engine, TwoPI, Vector } from "excalibur";
+import { CircleCollider, CollisionType, Color, Engine, Shape, TwoPI, Vector } from "excalibur";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { StatsComponent } from "~/ecs/stats.ecs";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
 import { SerializableObject } from "~/network/events/types";
 import { ActorType, SerializedVector } from "~/network/types";
-import { rand, round, vec, vecToArray } from "~/utils/math";
+import { rand, vec, vecToArray } from "~/utils/math";
 import { Resources } from "../resources";
 import { XpOrb } from "./XpOrb";
+
+export enum AsteroidType {
+    Small,
+    Medium,
+    Large,
+    Item,
+}
 
 export interface AsteroidState extends SerializableObject {
     pos: SerializedVector;
     vel: SerializedVector;
-    rotation: number;
-    angularVelocity: number;
     mass: number;
     health: number;
+    asteroidType: AsteroidType;
 }
 
 export interface AsteroidOptions {
@@ -24,17 +30,13 @@ export interface AsteroidOptions {
 
     pos?: Vector | [number, number];
     vel?: Vector | [number, number];
-    mass?: number;
-    rotation?: number;
-    angularVelocity?: number;
+    asteroidType?: AsteroidType;
 }
 
 export class Asteroid extends NetActor<AsteroidState> {
     public static readonly Tag = "asteroid";
 
     public readonly type: ActorType = ActorType.Asteroid;
-
-    private radius: number;
 
     get netBody() {
         return this.get(NetBodyComponent);
@@ -44,8 +46,11 @@ export class Asteroid extends NetActor<AsteroidState> {
         return this.get(StatsComponent);
     }
 
+    private asteroidCollider: CircleCollider;
+    public asteroidType: AsteroidType;
+
     constructor(options: AsteroidOptions = {}) {
-        const radius = 10;
+        const collider = Shape.Circle(10);
 
         super({
             name: "Asteroid",
@@ -54,31 +59,30 @@ export class Asteroid extends NetActor<AsteroidState> {
 
             pos: options.pos ? vec(options.pos) : undefined,
             vel: options.vel ? vec(options.vel) : undefined,
-            rotation: options.rotation,
-            angularVelocity: options.angularVelocity,
-            radius: radius,
+            rotation: rand.floating(0, TwoPI),
+            angularVelocity: rand.floating(-1, 1),
             collisionType: CollisionType.Passive,
+            collider: collider,
         });
 
         this.addTag(Asteroid.Tag);
 
         this.addComponent(new StatsComponent({ health: 50, power: 0, hardness: 20 }));
-        this.addComponent(new NetBodyComponent({ mass: options.mass ?? 10 }));
+        this.addComponent(new NetBodyComponent({ mass: 10 }));
 
-        this.radius = radius;
+        this.asteroidCollider = collider;
+        this.asteroidType = options.asteroidType ?? AsteroidType.Medium;
     }
 
     onInitialize(_engine: Engine): void {
-        const tint = this.isReplica ? Color.Orange : Color.DarkGray;
-        const sprite = ShadowedSprite.from(Resources.Asteroid, tint);
-        this.graphics.add(sprite);
+        this.setAsteroidStatsAndVisuals();
 
         this.on("precollision", (event) => {
             if (!this.isReplica && event.other.hasTag(Asteroid.Tag)) {
                 const other = event.other as Asteroid;
 
                 const normal = other.pos.sub(this.pos);
-                if (normal.distance() <= this.radius + 0.5) {
+                if (normal.distance() <= this.asteroidCollider.radius + 0.5) {
                     this.vel = this.vel.add(normal.normalize().negate().scale(1));
                 }
             }
@@ -89,14 +93,30 @@ export class Asteroid extends NetActor<AsteroidState> {
                 return;
             }
 
-            const count = rand.integer(2, 4);
-            const values = new Array(count).fill(0).map(() => rand.integer(2, 4));
+            if (this.asteroidType !== AsteroidType.Item) {
+                let count = 2;
+                if (this.asteroidType === AsteroidType.Small) {
+                    count = rand.integer(1, 2);
+                } else if (this.asteroidType === AsteroidType.Medium) {
+                    count = rand.integer(2, 4);
+                } else if (this.asteroidType === AsteroidType.Large) {
+                    count = rand.integer(6, 10);
+                }
 
-            XpOrb.spawn(this.scene, values, this.pos, this.vel);
+                const values = new Array(count).fill(0).map(() => rand.integer(1, 4));
+
+                XpOrb.spawn(this.scene, values, this.pos, this.vel);
+            } else {
+            }
         });
 
         this.on("damage", () => {
-            if (!this.scene || this.isReplica || this.isKilled()) {
+            if (
+                !this.scene ||
+                this.isReplica ||
+                this.isKilled() ||
+                this.asteroidType === AsteroidType.Item
+            ) {
                 return;
             }
 
@@ -112,6 +132,47 @@ export class Asteroid extends NetActor<AsteroidState> {
         });
     }
 
+    private setAsteroidStatsAndVisuals() {
+        let radius = 10;
+        let sprite = Resources.AsteroidMedium1;
+        let mass = 100;
+        let health = 60;
+
+        if (this.asteroidType === AsteroidType.Small) {
+            radius = 6;
+            sprite = rand.pickOne([Resources.AsteroidSmall1, Resources.AsteroidSmall2]);
+            mass = rand.integer(40, 60);
+            health = 30;
+        }
+
+        if (this.asteroidType === AsteroidType.Medium) {
+            radius = 10;
+            sprite = rand.pickOne([Resources.AsteroidMedium1, Resources.AsteroidMedium2]);
+            mass = rand.integer(100, 200);
+            health = 60;
+        }
+
+        if (this.asteroidType === AsteroidType.Large) {
+            radius = 18;
+            sprite = rand.pickOne([Resources.AsteroidLarge1, Resources.AsteroidLarge2]);
+            mass = rand.integer(400, 600);
+            health = 150;
+        }
+
+        if (this.asteroidType === AsteroidType.Item) {
+            radius = 10;
+            sprite = rand.pickOne([Resources.AsteroidItem1, Resources.AsteroidItem2]);
+            mass = rand.integer(60, 100);
+            health = 15;
+        }
+
+        this.asteroidCollider.radius = radius;
+        this.graphics.use(ShadowedSprite.from(sprite, Color.DarkGray));
+        this.netBody.mass = mass;
+        this.stats.health = health;
+        this.stats.maxHealth = health;
+    }
+
     onPostUpdate(engine: Engine<any>, _delta: number): void {
         const tint = engine.isDebug && this.isReplica ? Color.Orange : Color.DarkGray;
 
@@ -124,25 +185,24 @@ export class Asteroid extends NetActor<AsteroidState> {
         return {
             pos: vecToArray(this.pos, 2),
             vel: vecToArray(this.vel, 2),
-            rotation: round(this.rotation, 2),
-            angularVelocity: round(this.angularVelocity, 2),
             mass: this.netBody.mass,
             health: this.stats.health,
+            asteroidType: this.asteroidType,
         };
     }
 
     public updateState(state: AsteroidState, latency: number): void {
         this.pos = vec(...state.pos);
         this.vel = vec(...state.vel);
-        this.rotation = state.rotation;
-        this.angularVelocity = state.angularVelocity;
 
-        this.stats.health = state.health;
+        if (this.asteroidType !== state.asteroidType) {
+            this.asteroidType = state.asteroidType;
+            this.setAsteroidStatsAndVisuals();
+            this.stats.health = state.health;
+        }
 
         const delta = latency / 1000;
 
-        const newRotation = (this.angularVelocity * delta) % TwoPI;
-        this.rotation += newRotation + (newRotation < 0 ? TwoPI : 0);
         this.pos.addEqual(this.vel.scale(delta));
         this.netBody.mass = state.mass;
     }

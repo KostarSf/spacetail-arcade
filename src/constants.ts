@@ -5,4 +5,5 @@ export const Pallete = {
     gray200: Color.fromHex("#aaaaaa"),
     gray400: Color.fromHex("#777777"),
     gray600: Color.fromHex("#555555"),
+    gray800: Color.fromHex("#333333"),
 };

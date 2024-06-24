@@ -163,7 +163,8 @@ export class Player extends NetActor<PlayerState> {
             }
         });
 
-        const gathererSize = 128;
+        const gathererSize = 80;
+        const gatherPower =  10
         const xpOrbGatherer = new Actor({
             pos: this.pos,
             radius: gathererSize,
@@ -182,7 +183,7 @@ export class Player extends NetActor<PlayerState> {
             const force = this.pos
                 .sub(xpOrb.pos)
                 .normalize()
-                .scale(15 * koeff);
+                .scale(gatherPower * koeff);
 
             xpOrb.vel.addEqual(force);
         });

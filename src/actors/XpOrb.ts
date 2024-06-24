@@ -56,7 +56,7 @@ export class XpOrb extends NetActor<XpOrbState> {
 
             scale: Vector.One.scaleEqual(initialScale),
             rotation: rand.floating(0, TwoPI),
-            angularVelocity: rand.floating(-1, 1),
+            angularVelocity: rand.floating(-3, 3),
         });
 
         this.addComponent(new NetBodyComponent({ mass: 1 }));

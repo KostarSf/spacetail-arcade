@@ -1,4 +1,5 @@
 import {
+    clamp,
     Color,
     EmitterType,
     Engine,
@@ -11,7 +12,7 @@ import {
     vec,
     Vector,
 } from "excalibur";
-import { Asteroid } from "~/actors/Asteroid";
+import { Asteroid, AsteroidType } from "~/actors/Asteroid";
 import { Player } from "~/actors/Player";
 import { Pallete } from "~/constants";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
@@ -89,15 +90,24 @@ export class NetScene extends Scene {
         }
 
         const posLimit = this.worldSize;
-        const velLimit = 10;
+        const velLimit = rand.next() < 0.2 ? 60 : 15;
+
+        const chanse = rand.next();
+        let asteroidType = AsteroidType.Medium;
+        if (chanse < 0.1) {
+            asteroidType = AsteroidType.Item;
+        } else if (chanse < 0.4) {
+            asteroidType = AsteroidType.Small;
+        } else if (chanse < 0.6) {
+            asteroidType = AsteroidType.Large;
+        }
 
         const asteroid = new Asteroid({
             pos: vec(rand.floating(-posLimit, posLimit), rand.floating(-posLimit, posLimit)),
             vel: vec(rand.floating(-velLimit, velLimit), rand.floating(-velLimit, velLimit)),
-            rotation: rand.floating(0, Math.PI * 2),
-            angularVelocity: rand.floating(-1, 1),
-            mass: rand.integer(100, 300),
+            asteroidType: asteroidType,
         });
+
         this.add(asteroid);
     }
 
@@ -111,6 +121,26 @@ export class NetScene extends Scene {
                 Math.abs((asteroid as Asteroid).pos.y) > limit
             ) {
                 asteroid.kill();
+            }
+        });
+
+        let player: Player;
+        const worldBoder = this.worldSize + 16;
+        this.playersQuery.entities.forEach((entity) => {
+            player = entity as Player;
+
+            if (
+                player.pos.x < -worldBoder ||
+                player.pos.x > worldBoder ||
+                player.pos.y < -worldBoder ||
+                player.pos.y > worldBoder
+            ) {
+                player.pos.setTo(
+                    clamp(player.pos.x, -this.worldSize, this.worldSize),
+                    clamp(player.pos.y, -this.worldSize, this.worldSize)
+                );
+                player.vel.setTo(0, 0);
+                player.markStale();
             }
         });
 
@@ -198,7 +228,7 @@ class SpaceGraphics {
         const worldSize = this.scene.worldSize;
         const detectRadius = this.scene.detectRadiusSquare;
 
-        const mapSize = 64;
+        const mapSize = 128;
         const mapOffset = 32;
         const offset = vec(mapOffset, mapOffset);
 
@@ -206,18 +236,23 @@ class SpaceGraphics {
         background.a = 0.8;
 
         ctx.drawRectangle(
-            offset.sub(vec(2, 2)),
-            mapSize + 4,
-            mapSize + 4,
+            offset.sub(vec(4, 4)),
+            mapSize + 8,
+            mapSize + 8,
             background,
             Color.Transparent
         );
-        ctx.drawRectangle(offset, mapSize, mapSize, Color.Transparent, Color.Gray, 2);
+        ctx.drawRectangle(
+            offset.sub(vec(2, 2)),
+            mapSize + 4,
+            mapSize + 4,
+            Color.Transparent,
+            Color.Gray,
+            2
+        );
 
         let transform: TransformComponent;
         let pos: Vector;
-
-        const dark = Color.fromHex("#333333");
 
         this.scene.asteroidsQuery.entities.forEach((entity) => {
             transform = entity.get(TransformComponent);
@@ -230,7 +265,13 @@ class SpaceGraphics {
                 linInt(transform.pos.y, -worldSize, worldSize, 0, mapSize - 2)
             ).addEqual(offset);
 
-            ctx.drawRectangle(pos, 1, 1, dark);
+            const size = (entity as Asteroid).asteroidType === AsteroidType.Large ? 2 : 1;
+            const color =
+                (entity as Asteroid).asteroidType === AsteroidType.Item
+                    ? Pallete.gray200
+                    : Pallete.gray800;
+
+            ctx.drawRectangle(pos, size, size, color);
         });
 
         this.scene.playersQuery.entities.forEach((entity) => {

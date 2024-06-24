@@ -24,6 +24,7 @@ import { UpdateEntityEvent } from "./events/UpdateEntityEvent";
 import { NetStateComponent } from "./NetStateComponent";
 import Network from "./Network";
 import { ActorType } from "./types";
+import { NetBodyComponent } from "~/ecs/physics.ecs";
 
 export type NetActorEvents = ActorEvents & {
     action: ActionEvent;
@@ -158,7 +159,11 @@ export abstract class NetActor<NetState extends SerializableObject = {}> extends
                 stats.power += stats.powerRecoverySpeed * delta;
 
                 if (action.direction) {
-                    this.vel.subEqual(Vector.fromAngle(action.direction).scale(damage));
+                    const mass = this.get(NetBodyComponent)?.mass ?? 10;
+
+                    this.vel.subEqual(
+                        Vector.fromAngle(action.direction).scale((damage * 10) / mass)
+                    );
                     this.markStale();
                 }
 

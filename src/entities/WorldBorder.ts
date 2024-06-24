@@ -1,15 +1,15 @@
 import {
     Actor,
     CollisionType,
-    Color,
     CompositeCollider,
     Engine,
     GraphicsGroup,
     Line,
     Shape,
     vec,
-    Vector,
+    Vector
 } from "excalibur";
+import { Pallete } from "~/constants";
 
 export class WorldBorder extends Actor {
     public static readonly Tag = "worldborder";
@@ -39,25 +39,25 @@ export class WorldBorder extends Actor {
             new Line({
                 start: vec(-size, size),
                 end: vec(size, size),
-                color: Color.Red,
+                color: Pallete.gray800,
                 thickness: 3,
             }),
             new Line({
                 start: vec(-size, -size),
                 end: vec(size, -size),
-                color: Color.Red,
+                color: Pallete.gray800,
                 thickness: 3,
             }),
             new Line({
                 start: vec(-size, -size),
                 end: vec(-size, size),
-                color: Color.Red,
+                color: Pallete.gray800,
                 thickness: 3,
             }),
             new Line({
                 start: vec(size, -size),
                 end: vec(size, size),
-                color: Color.Red,
+                color: Pallete.gray800,
                 thickness: 3,
             }),
         ];

@@ -74,6 +74,10 @@ export class NetBodyComponent extends Component {
                 return;
             }
 
+            if (target.hasTag(XpOrb.Tag) || other.hasTag(XpOrb.Tag)) {
+                return;
+            }
+
             const otherBody = other.get(NetBodyComponent);
 
             const collisionDirection = otherBody.pos.sub(thisBody.pos);
@@ -96,10 +100,6 @@ export class NetBodyComponent extends Component {
 
             const impulse = collisionNormal.scale(impulseScalar);
             thisBody.nextVel = thisBody.vel.sub(impulse.scale(1 / thisBody.mass));
-
-            if (target.hasTag(XpOrb.Tag) || other.hasTag(XpOrb.Tag)) {
-                return;
-            }
 
             if (!target.isReplica) {
                 const threshhold = Math.max(0, relativeVelocity.distance() - 50);

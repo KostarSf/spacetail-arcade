@@ -1,5 +1,12 @@
 import { Animation, AnimationStrategy, ImageSource, Loader, SpriteSheet, range } from "excalibur";
-import asteroid from "./images/asteroid.png";
+import asteroidItem1 from "./images/asteroids/item-01.png";
+import asteroidItem2 from "./images/asteroids/item-02.png";
+import asteroidLarge1 from "./images/asteroids/large-01.png";
+import asteroidLarge2 from "./images/asteroids/large-02.png";
+import asteroidMedium1 from "./images/asteroids/medium-01.png";
+import asteroidMedium2 from "./images/asteroids/medium-02.png";
+import asteroidSmall1 from "./images/asteroids/small-01.png";
+import asteroidSmall2 from "./images/asteroids/small-02.png";
 import bullet from "./images/bullet.png";
 import explosion from "./images/explosion.png";
 import jetstream from "./images/jetstream.png";
@@ -17,7 +24,14 @@ export const Resources = {
     Pirate: new ImageSource(pirate),
     PirateDamaged: new ImageSource(pirateDamaged),
 
-    Asteroid: new ImageSource(asteroid),
+    AsteroidSmall1: new ImageSource(asteroidSmall1),
+    AsteroidSmall2: new ImageSource(asteroidSmall2),
+    AsteroidMedium1: new ImageSource(asteroidMedium1),
+    AsteroidMedium2: new ImageSource(asteroidMedium2),
+    AsteroidLarge1: new ImageSource(asteroidLarge1),
+    AsteroidLarge2: new ImageSource(asteroidLarge2),
+    AsteroidItem1: new ImageSource(asteroidItem1),
+    AsteroidItem2: new ImageSource(asteroidItem2),
     Bullet: new ImageSource(bullet),
 
     Space: new ImageSource(space),

@@ -8,7 +8,7 @@ export function lerp(
     max: number,
     interpolationFn: (value: number) => number = linear
 ) {
-    const clampedValue = Math.max(min, Math.min(value, max));
+    const clampedValue = clamp(value, min, max);
     const normalizedValue = (clampedValue - min) / (max - min);
     return interpolationFn(normalizedValue);
 }
