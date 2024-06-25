@@ -5,6 +5,7 @@ import {
     Entity,
     ExcaliburGraphicsContext,
     GraphicsComponent,
+    ParallaxComponent,
     Scene,
     TransformComponent,
     vec,
@@ -20,6 +21,9 @@ export interface DebreeOptions {
     blinkSpeed: number;
     blinkDelta?: number;
     initialOpacity?: number;
+    parallax?: number;
+    tag?: string;
+    fadeInTime?: number; // TODO
 }
 
 export class Debree extends Entity {
@@ -67,6 +71,15 @@ export class Debree extends Entity {
         this.color = Color.White;
         this.blinkDelta = options.blinkDelta ?? 0.3;
         this.initialOpacity = clamp(options.initialOpacity ?? 1, 0, 1);
+
+        if (options.parallax) {
+            const factor = 1 + clamp(options.parallax, -1, 1);
+            this.addComponent(new ParallaxComponent(vec(factor, factor)));
+        }
+
+        if (options.tag) {
+            this.addTag(options.tag);
+        }
     }
 
     public get isOffScreen(): boolean {
@@ -115,6 +128,9 @@ export class Debree extends Entity {
         blinkSpeedSpread?: number;
         blinkDelta?: number;
         blinkDeltaSpread?: number;
+        z?: number;
+        zSpread?: number;
+        tag?: string;
     }) {
         const {
             scene,
@@ -134,17 +150,26 @@ export class Debree extends Entity {
             blinkSpeedSpread = 0,
             blinkDelta: initialBlinkDelta = 0,
             blinkDeltaSpread = 0,
+            z = 0,
+            zSpread = 0,
         } = args;
 
         let pos: Vector;
         let vel: Vector;
         for (let i = 0; i < amount; i++) {
+            const parallax = clamp(z + rand.floating(-zSpread * 0.5, zSpread * 0.5), -0.95, 0.95);
+
             pos = initialPos.add(
                 vec(
                     rand.floating(-posSpread * 0.5, posSpread * 0.5),
                     rand.floating(-posSpread * 0.5, posSpread * 0.5)
                 )
             );
+
+            const parallaxFactor = vec(1 + parallax, 1 + parallax);
+            const oneMinusFactor = Vector.One.sub(parallaxFactor);
+            const parallaxOffset = scene.camera.pos.scale(oneMinusFactor);
+            pos.subEqual(parallaxOffset);
 
             vel = initialVel.clone();
             const speedDelta = rand.floating(-speedSpread * 0.5, speedSpread * 0.5);
@@ -173,6 +198,8 @@ export class Debree extends Entity {
                     blinkDelta,
                     initialOpacity: opacity,
                     size,
+                    parallax,
+                    tag: args.tag,
                 })
             );
         }

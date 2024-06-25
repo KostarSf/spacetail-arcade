@@ -1,14 +1,13 @@
 import {
     clamp,
     Color,
-    EmitterType,
     Engine,
     ExcaliburGraphicsContext,
-    ParticleEmitter,
     Scene,
     TagQuery,
     Timer,
     TransformComponent,
+    TwoPI,
     vec,
     Vector,
 } from "excalibur";
@@ -17,6 +16,7 @@ import { Player } from "~/actors/Player";
 import { Pallete } from "~/constants";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
 import { StatsSystem } from "~/ecs/stats.ecs";
+import { Debree } from "~/entities/Debree";
 import { Decal } from "~/entities/Decal";
 import { WorldBorder } from "~/entities/WorldBorder";
 import { NetSystem } from "~/network/NetSystem";
@@ -158,7 +158,9 @@ export class NetScene extends Scene {
 }
 
 class SpaceGraphics {
-    private starsParticles!: ParticleEmitter;
+    private readonly bgStarTag = "bgstar";
+    private starQuery!: TagQuery<typeof this.bgStarTag>;
+    private starsLimit = 500; // 200
 
     private scene: NetScene;
 
@@ -166,7 +168,9 @@ class SpaceGraphics {
         this.scene = scene;
     }
 
-    initialize(engine: Engine) {
+    initialize(_engine: Engine) {
+        this.starQuery = this.scene.world.queryManager.createTagQuery([this.bgStarTag]);
+
         const space = new Decal({
             image: Resources.Space,
             pos: vec(0, 0),
@@ -174,24 +178,6 @@ class SpaceGraphics {
             zoomResist: 1.3,
         });
         this.scene.add(space);
-
-        this.starsParticles = new ParticleEmitter({
-            emitterType: EmitterType.Rectangle,
-            width: engine.drawWidth * 2,
-            height: engine.drawHeight * 2,
-            x: -engine.drawWidth,
-            y: -engine.drawHeight,
-            minAngle: 0,
-            maxAngle: Math.PI * 2,
-            emitRate: 50,
-            fadeFlag: true,
-            minSize: 0.8,
-            maxSize: 1.2,
-            particleLife: 5000,
-            isEmitting: true,
-            opacity: 0.7,
-        });
-        this.scene.add(this.starsParticles);
 
         if (this.scene.player) {
             this.scene.camera.strategy.radiusAroundActor(this.scene.player, 50);
@@ -212,13 +198,13 @@ class SpaceGraphics {
     }
 
     update(engine: Engine, delta: number) {
-        if (this.scene.player) {
-            this.starsParticles.transform.pos = this.scene.player.pos.sub(
-                vec(engine.halfDrawWidth, engine.halfDrawHeight)
-            );
-
-            this.updateCamera(engine, delta, this.scene.player);
+        if (!this.scene.player) {
+            return;
         }
+
+        this.spawnStars(engine, delta);
+
+        this.updateCamera(engine, delta, this.scene.player);
     }
 
     draw(ctx: ExcaliburGraphicsContext, _delta: number): void {
@@ -309,5 +295,38 @@ class SpaceGraphics {
         const lastZoom = engine.currentScene.camera.zoom;
 
         this.scene.camera.zoom = lastZoom + (newZoom - lastZoom) * delta * 2;
+    }
+
+    private spawnStars(engine: Engine, _delta: number) {
+        if (this.starQuery.entities.length >= this.starsLimit || 0.6 < rand.next()) {
+            return;
+        }
+
+        const largestDimension =
+            engine.drawWidth > engine.drawHeight ? engine.drawWidth : engine.drawHeight;
+
+        console.log(this.scene.camera.pos);
+
+        Debree.emit({
+            scene: this.scene,
+            pos: this.scene.camera.pos,
+            posSpread: largestDimension + 32,
+            size: 2.5,
+            sizeSpread: 2,
+            timeToLive: 6000,
+            timeToLiveSpread: 3000,
+            vel: vec(0.5,0.5),
+            speedSpread: 1,
+            angleSpread: TwoPI,
+            opacity: 0.6,
+            opacitySpread: 0.5,
+            blinkSpeed: 800,
+            blinkSpeedSpread: 400,
+            blinkDelta: 0.05,
+            blinkDeltaSpread: 0.05,
+            z: -0.6,
+            zSpread: 0.8,
+            tag: this.bgStarTag,
+        });
     }
 }
