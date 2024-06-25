@@ -8,7 +8,7 @@ import { ActorType, SerializedVector } from "~/network/types";
 import { rand, vec, vecToArray } from "~/utils/math";
 import { Resources } from "../resources";
 import { XpOrb } from "./XpOrb";
-import { Debree } from "~/entities/Debree";
+import { Particle } from "~/entities/Particle";
 
 export enum AsteroidType {
     Small,
@@ -91,7 +91,7 @@ export class Asteroid extends NetActor<AsteroidState> {
 
         this.on("kill", () => {
             if (this.scene && !this.isKilled()) {
-                Debree.emit({
+                Particle.emit({
                     scene: this.scene,
                     pos: this.pos,
                     posSpread: this.asteroidCollider.radius * 0.8,

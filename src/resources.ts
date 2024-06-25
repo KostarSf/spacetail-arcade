@@ -20,6 +20,7 @@ import playerDamaged2 from "./images/player-damaged-2.png";
 import playerShield from "./images/player-shield.png";
 import player from "./images/player.png";
 import space from "./images/space.png";
+import glare from "./images/glare.png";
 
 export const Resources = {
     Player: new ImageSource(player),
@@ -40,9 +41,12 @@ export const Resources = {
     AsteroidLarge2: new ImageSource(asteroidLarge2),
     AsteroidItem1: new ImageSource(asteroidItem1),
     AsteroidItem2: new ImageSource(asteroidItem2),
+
     Bullet: new ImageSource(bullet),
 
     Space: new ImageSource(space),
+
+    Glare: new ImageSource(glare),
 
     Explosion: new ImageSource(explosion),
     JetStream: new ImageSource(jetstream),

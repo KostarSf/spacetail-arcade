@@ -5,17 +5,21 @@ import {
     Entity,
     ExcaliburGraphicsContext,
     GraphicsComponent,
+    GraphicsGroup,
     ParallaxComponent,
     Scene,
+    Sprite,
     TransformComponent,
     vec,
     Vector,
 } from "excalibur";
+import { Resources } from "~/resources";
 import { rand } from "~/utils/math";
 
-export interface DebreeOptions {
+export interface ParticleOptions {
     pos: Vector;
     vel: Vector;
+    rotation?: number;
     timeToLive: number;
     size: number;
     blinkSpeed: number;
@@ -24,9 +28,10 @@ export interface DebreeOptions {
     parallax?: number;
     tag?: string;
     fadeInTime?: number; // TODO
+    withGlare?: boolean;
 }
 
-export class Debree extends Entity {
+export class Particle extends Entity {
     private vel: Vector;
 
     private size: number;
@@ -35,10 +40,14 @@ export class Debree extends Entity {
     private blinkSpeed: number;
     private timeAfterLastBlink: number;
     private initialOpacity;
-
+    private rotation: number;
     private color: Color;
     private origin: Vector;
     private blinkDelta: number;
+
+    private glare1!: Sprite;
+    private glare2!: Sprite;
+    private withGlare: boolean = false;
 
     public get pos() {
         return this.get(TransformComponent).pos;
@@ -48,7 +57,7 @@ export class Debree extends Entity {
         this.get(TransformComponent).pos = value;
     }
 
-    constructor(options: DebreeOptions) {
+    constructor(options: ParticleOptions) {
         const transform = new TransformComponent();
         const graphics = new GraphicsComponent({
             onPostDraw: (ex) => this.onPostDraw(ex),
@@ -72,6 +81,8 @@ export class Debree extends Entity {
         this.blinkDelta = options.blinkDelta ?? 0.3;
         this.initialOpacity = clamp(options.initialOpacity ?? 1, 0, 1);
 
+        this.rotation = options.rotation ?? 0;
+
         if (options.parallax) {
             const factor = 1 + clamp(options.parallax, -1, 1);
             this.addComponent(new ParallaxComponent(vec(factor, factor)));
@@ -79,6 +90,30 @@ export class Debree extends Entity {
 
         if (options.tag) {
             this.addTag(options.tag);
+        }
+
+        if (options.withGlare) {
+            this.withGlare = true;
+
+            const glare1 = Resources.Glare.toSprite();
+            const glare2 = Resources.Glare.toSprite();
+
+            glare1.opacity = glare2.opacity = 0.2;
+            glare1.width = glare2.width = 80;
+            glare1.scale = glare2.scale = vec(this.size * 0.2, this.size * 0.2);
+
+            // glare1.rotation = glare2.rotation = this.rotation;
+            glare2.rotation += Math.PI * 0.5;
+            glare1.origin = glare2.origin = vec(40, 16);
+
+            graphics.use(
+                new GraphicsGroup({
+                    members: [glare1, glare2],
+                })
+            );
+
+            this.glare1 = glare1;
+            this.glare2 = glare2;
         }
     }
 
@@ -103,10 +138,16 @@ export class Debree extends Entity {
 
         const rawOpacity =
             (this.timeRemain / this.timeToLive) * this.initialOpacity - this.blinkDelta;
-        this.color.a = clamp(rawOpacity, 0, 1);
+        let opacity = clamp(rawOpacity, 0, 1);
+
+        this.color.a = opacity;
+        if (this.withGlare) {
+            this.glare1.opacity = this.glare2.opacity = opacity;
+        }
     }
 
     private onPostDraw(ex: ExcaliburGraphicsContext) {
+        ex.rotate(this.rotation);
         ex.drawRectangle(this.origin, this.size, this.size, this.color);
     }
 
@@ -116,12 +157,19 @@ export class Debree extends Entity {
         sizeSpread?: number;
         pos: Vector;
         vel: Vector;
+        acc?: Vector; // TODO
+        accSpeedSpread?: number; // TODO
         posSpread?: number;
         speedSpread?: number;
         angleSpread?: number;
+        rotation?: number;
+        rotationSpread?: number;
+        glareChange?: number;
         amount?: number;
         opacity?: number;
         opacitySpread?: number;
+        fadeInTime?: number; // TODO
+        fadeInTimeSpread?: number; // TODO
         timeToLive: number;
         timeToLiveSpread?: number;
         blinkSpeed?: number;
@@ -141,6 +189,8 @@ export class Debree extends Entity {
             vel: initialVel,
             speedSpread = 0,
             angleSpread = 0,
+            rotation: initialRotation = 0,
+            rotationSpread = 0,
             amount = 1,
             opacity: initialOpacity = 1,
             opacitySpread = 0,
@@ -152,6 +202,7 @@ export class Debree extends Entity {
             blinkDeltaSpread = 0,
             z = 0,
             zSpread = 0,
+            glareChange = 0,
         } = args;
 
         if (!scene) {
@@ -193,16 +244,22 @@ export class Debree extends Entity {
                 initialBlinkDelta + rand.floating(-blinkDeltaSpread * 0.5, blinkDeltaSpread * 0.5);
             const size = initialSize + rand.floating(-sizeSpread * 0.5, sizeSpread * 0.5);
 
+            const rotation =
+                initialRotation + rand.floating(-rotationSpread * 0.5, rotationSpread * 0.5);
+            const withGlare = clamp(glareChange, 0, 1) > rand.next();
+
             scene.add(
-                new Debree({
+                new Particle({
                     pos,
                     vel,
+                    rotation,
                     blinkSpeed,
                     timeToLive,
                     blinkDelta,
                     initialOpacity: opacity,
                     size,
                     parallax,
+                    withGlare,
                     tag: args.tag,
                 })
             );

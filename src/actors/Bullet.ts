@@ -1,5 +1,4 @@
 import { CollisionType, Engine, Vector, vec } from "excalibur";
-import { Debree } from "~/entities/Debree";
 import { drawGlare } from "~/graphics/Glare";
 import { NetActor } from "~/network/NetActor";
 import { DamageAction } from "~/network/events/actions/DamageAction";
@@ -8,6 +7,7 @@ import { ActorType, SerializedVector } from "~/network/types";
 import { rand, round, vecToArray } from "~/utils/math";
 import { Animations } from "../resources";
 import { XpOrb } from "./XpOrb";
+import { Particle } from "~/entities/Particle";
 
 export interface BulletState extends SerializableObject {
     shooter: string | null;
@@ -85,7 +85,7 @@ export class Bullet extends NetActor<BulletState> {
             }
 
             if (this.scene) {
-                Debree.emit({
+                Particle.emit({
                     scene: this.scene,
                     pos: this.pos,
                     posSpread: 5,
@@ -133,7 +133,7 @@ export class Bullet extends NetActor<BulletState> {
             return;
         }
 
-        Debree.emit({
+        Particle.emit({
             scene: engine.currentScene,
             size: 1.2,
             sizeSpread: 0.7,

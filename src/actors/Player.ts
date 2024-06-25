@@ -22,7 +22,6 @@ import { v4 } from "uuid";
 import { Pallete } from "~/constants";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { StatsComponent } from "~/ecs/stats.ecs";
-import { Debree } from "~/entities/Debree";
 import { ResourceLine } from "~/graphics/ResourceLine";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
@@ -32,6 +31,7 @@ import { Animations, Resources } from "~/resources";
 import { easeOut, lerp, linear, rand, round, vecToArray } from "~/utils/math";
 import { Bullet } from "./Bullet";
 import { XpOrb } from "./XpOrb";
+import { Particle } from "~/entities/Particle";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
@@ -236,7 +236,7 @@ export class Player extends NetActor<PlayerState> {
             }
 
             if (evt.amount > 0 && this.scene) {
-                Debree.emit({
+                Particle.emit({
                     scene: this.scene,
                     pos: this.pos,
                     posSpread: 5,
@@ -264,7 +264,7 @@ export class Player extends NetActor<PlayerState> {
             xpOrbGatherer.kill();
             xpLabel.kill();
 
-            Debree.emit({
+            Particle.emit({
                 scene: this.scene,
                 pos: this.pos,
                 posSpread: 5,

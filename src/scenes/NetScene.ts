@@ -16,8 +16,8 @@ import { Player } from "~/actors/Player";
 import { Pallete } from "~/constants";
 import { NetPhysicsSystem } from "~/ecs/physics.ecs";
 import { StatsSystem } from "~/ecs/stats.ecs";
-import { Debree } from "~/entities/Debree";
 import { Decal } from "~/entities/Decal";
+import { Particle } from "~/entities/Particle";
 import { WorldBorder } from "~/entities/WorldBorder";
 import { NetSystem } from "~/network/NetSystem";
 import Network from "~/network/Network";
@@ -290,7 +290,7 @@ class SpaceGraphics {
         const speed = player.vel.distance();
 
         const zoomFactor = lerp(speed, 0, 1000, easeOut);
-        const newZoom = 1.1 - zoomFactor * 0.4;
+        const newZoom = 1.3 - zoomFactor * 0.4;
 
         const lastZoom = engine.currentScene.camera.zoom;
 
@@ -305,18 +305,20 @@ class SpaceGraphics {
         const largestDimension =
             engine.drawWidth > engine.drawHeight ? engine.drawWidth : engine.drawHeight;
 
-        Debree.emit({
+        Particle.emit({
             scene: this.scene,
             pos: this.scene.camera.pos,
             posSpread: largestDimension + 32,
             amount: 3,
-            size: 2.5,
+            size: 1.5,
             sizeSpread: 2,
             timeToLive: 6000,
             timeToLiveSpread: 3000,
             vel: vec(0.5,0.5),
             speedSpread: 1,
             angleSpread: TwoPI,
+            rotationSpread: TwoPI,
+            glareChange: 0.01,
             opacity: 0.4,
             opacitySpread: 0.6,
             blinkSpeed: 800,
