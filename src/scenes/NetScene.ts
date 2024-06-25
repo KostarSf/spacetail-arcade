@@ -34,9 +34,9 @@ export class NetScene extends Scene {
     public asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
     public playersQuery!: TagQuery<typeof Player.Tag>;
 
-    public readonly worldSize = 5_000;
-    public readonly maxAsteroidsCount = 200;
-    public readonly detectRadius = 2500;
+    public readonly worldSize = 10_000;
+    public readonly maxAsteroidsCount = 500;
+    public readonly detectRadius = 3500;
     public readonly detectRadiusSquare = Math.pow(this.detectRadius, 2);
 
     constructor() {
@@ -160,7 +160,7 @@ export class NetScene extends Scene {
 class SpaceGraphics {
     private readonly bgStarTag = "bgstar";
     private starQuery!: TagQuery<typeof this.bgStarTag>;
-    private starsLimit = 500; // 200
+    private starsLimit = 500;
 
     private scene: NetScene;
 
@@ -305,12 +305,11 @@ class SpaceGraphics {
         const largestDimension =
             engine.drawWidth > engine.drawHeight ? engine.drawWidth : engine.drawHeight;
 
-        console.log(this.scene.camera.pos);
-
         Debree.emit({
             scene: this.scene,
             pos: this.scene.camera.pos,
             posSpread: largestDimension + 32,
+            amount: 3,
             size: 2.5,
             sizeSpread: 2,
             timeToLive: 6000,
@@ -318,14 +317,14 @@ class SpaceGraphics {
             vel: vec(0.5,0.5),
             speedSpread: 1,
             angleSpread: TwoPI,
-            opacity: 0.6,
-            opacitySpread: 0.5,
+            opacity: 0.4,
+            opacitySpread: 0.6,
             blinkSpeed: 800,
             blinkSpeedSpread: 400,
             blinkDelta: 0.05,
             blinkDeltaSpread: 0.05,
-            z: -0.6,
-            zSpread: 0.8,
+            z: -0.8,
+            zSpread: 0.3,
             tag: this.bgStarTag,
         });
     }

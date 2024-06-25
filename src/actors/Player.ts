@@ -22,6 +22,7 @@ import { v4 } from "uuid";
 import { Pallete } from "~/constants";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { StatsComponent } from "~/ecs/stats.ecs";
+import { Debree } from "~/entities/Debree";
 import { ResourceLine } from "~/graphics/ResourceLine";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
@@ -31,7 +32,6 @@ import { Animations, Resources } from "~/resources";
 import { easeOut, lerp, linear, rand, round, vecToArray } from "~/utils/math";
 import { Bullet } from "./Bullet";
 import { XpOrb } from "./XpOrb";
-import { Debree } from "~/entities/Debree";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
@@ -254,6 +254,8 @@ export class Player extends NetActor<PlayerState> {
                     blinkSpeedSpread: 200,
                     opacity: 0.9,
                     opacitySpread: 0.1,
+                    z: 0.2,
+                    zSpread: 0.6,
                 });
             }
         });
@@ -261,6 +263,28 @@ export class Player extends NetActor<PlayerState> {
         this.on("kill", () => {
             xpOrbGatherer.kill();
             xpLabel.kill();
+
+            Debree.emit({
+                scene: this.scene,
+                pos: this.pos,
+                posSpread: 5,
+                vel: Vector.One.scale(40),
+                speedSpread: 1.7,
+                angleSpread: TwoPI,
+                size: 3,
+                sizeSpread: 4,
+                timeToLive: 1000,
+                timeToLiveSpread: 500,
+                amount: rand.integer(20, 30),
+                blinkDelta: 0.2,
+                blinkDeltaSpread: 0.1,
+                blinkSpeed: 400,
+                blinkSpeedSpread: 200,
+                opacity: 0.9,
+                opacitySpread: 0.1,
+                z: 0.2,
+                zSpread: 0.6,
+            });
 
             if (this.isReplica || this.isKilled() || !this.scene) {
                 return;

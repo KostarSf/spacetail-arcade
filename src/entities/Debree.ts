@@ -111,7 +111,7 @@ export class Debree extends Entity {
     }
 
     public static emit(args: {
-        scene: Scene;
+        scene: Scene | undefined | null;
         size: number;
         sizeSpread?: number;
         pos: Vector;
@@ -153,6 +153,10 @@ export class Debree extends Entity {
             z = 0,
             zSpread = 0,
         } = args;
+
+        if (!scene) {
+            return;
+        }
 
         let pos: Vector;
         let vel: Vector;

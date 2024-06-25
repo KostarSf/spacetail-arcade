@@ -5,6 +5,7 @@ import {
     Entity,
     Font,
     GraphicsComponent,
+    GraphicsGroup,
     ImageFiltering,
     MotionComponent,
     Text,
@@ -48,16 +49,26 @@ export class HitLabel extends Entity {
     onInitialize(_engine: Engine): void {
         const isHeal = this.value > 0;
 
+        const text = `${isHeal ? "+" : ""}${this.value}`;
+        const font = new Font({
+            family: "monospace",
+            filtering: ImageFiltering.Pixel,
+            size: 12,
+            bold: true,
+        });
+
         this.get(GraphicsComponent).use(
-            new Text({
-                text: `${isHeal ? "+" : ""}${this.value}`,
-                color: isHeal ? Color.White : Pallete.gray100,
-                font: new Font({
-                    family: "monospace",
-                    filtering: ImageFiltering.Pixel,
-                    size: 12,
-                    bold: true,
-                }),
+            new GraphicsGroup({
+                members: [
+                    {
+                        graphic: new Text({ text, color: Pallete.gray900, font }),
+                        offset: vec(1, 1),
+                    },
+                    {
+                        graphic: new Text({ text, color: Color.White, font }),
+                        offset: Vector.Zero,
+                    },
+                ],
             })
         );
 
