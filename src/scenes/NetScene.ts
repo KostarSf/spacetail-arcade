@@ -1,8 +1,9 @@
 import {
-    clamp,
+    Actor,
     Color,
     Engine,
     ExcaliburGraphicsContext,
+    Query,
     Scene,
     TagQuery,
     Timer,
@@ -19,6 +20,8 @@ import { StatsSystem } from "~/ecs/stats.ecs";
 import { Decal } from "~/entities/Decal";
 import { Particle } from "~/entities/Particle";
 import { WorldBorder } from "~/entities/WorldBorder";
+import { NetActor } from "~/network/NetActor";
+import { NetStateComponent } from "~/network/NetStateComponent";
 import { NetSystem } from "~/network/NetSystem";
 import Network from "~/network/Network";
 import { Resources } from "~/resources";
@@ -33,10 +36,12 @@ export class NetScene extends Scene {
 
     public asteroidsQuery!: TagQuery<typeof Asteroid.Tag>;
     public playersQuery!: TagQuery<typeof Player.Tag>;
+    public netActorsQuery!: Query<typeof NetStateComponent>;
 
     public readonly worldSize = 10_000;
+    public readonly halfWorldSize = this.worldSize / 2;
     public readonly maxAsteroidsCount = 500;
-    public readonly detectRadius = 3500;
+    public readonly detectRadius = 2500;
     public readonly detectRadiusSquare = Math.pow(this.detectRadius, 2);
 
     constructor() {
@@ -48,12 +53,13 @@ export class NetScene extends Scene {
     onInitialize(engine: Engine): void {
         this.playersQuery = this.world.queryTags([Player.Tag]);
         this.asteroidsQuery = this.world.queryTags([Asteroid.Tag]);
+        this.netActorsQuery = this.world.query([NetStateComponent]);
 
         this.world.add(NetSystem);
         this.world.add(NetPhysicsSystem);
         this.world.add(StatsSystem);
 
-        const playerPosLimit = this.worldSize * 0.8;
+        const playerPosLimit = this.halfWorldSize * 0.8;
         this.player = new Player({
             pos: vec(
                 rand.integer(-playerPosLimit, playerPosLimit),
@@ -63,7 +69,7 @@ export class NetScene extends Scene {
 
         this.graphics.initialize(engine);
 
-        const worldBorder = new WorldBorder(this.worldSize);
+        const worldBorder = new WorldBorder({ worldSize: this.worldSize });
         this.add(worldBorder);
 
         this.add(this.player);
@@ -89,8 +95,8 @@ export class NetScene extends Scene {
             return;
         }
 
-        const posLimit = this.worldSize;
-        const velLimit = rand.next() < 0.2 ? 60 : 15;
+        const posLimit = this.halfWorldSize;
+        const velLimit = rand.next() < 0.2 ? 350 : 50;
 
         const chanse = rand.next();
         let asteroidType = AsteroidType.Medium;
@@ -114,33 +120,16 @@ export class NetScene extends Scene {
     onPostUpdate(engine: Engine<any>, delta: number): void {
         this.graphics.update(engine, delta);
 
-        const limit = this.worldSize;
-        this.asteroidsQuery.entities.forEach((asteroid) => {
-            if (
-                Math.abs((asteroid as Asteroid).pos.x) > limit ||
-                Math.abs((asteroid as Asteroid).pos.y) > limit
-            ) {
-                asteroid.kill();
-            }
-        });
+        this.netActorsQuery.entities.forEach((entity) => {
+            const actor = entity as NetActor;
 
-        let player: Player;
-        const worldBoder = this.worldSize + 16;
-        this.playersQuery.entities.forEach((entity) => {
-            player = entity as Player;
+            if (this.actorOutOfWorld(actor)) {
+                this.teleportActorBackToWorld(actor);
+                if (actor === this.player) {
+                    this.camera.pos = this.player.pos;
+                }
 
-            if (
-                player.pos.x < -worldBoder ||
-                player.pos.x > worldBoder ||
-                player.pos.y < -worldBoder ||
-                player.pos.y > worldBoder
-            ) {
-                player.pos.setTo(
-                    clamp(player.pos.x, -this.worldSize, this.worldSize),
-                    clamp(player.pos.y, -this.worldSize, this.worldSize)
-                );
-                player.vel.setTo(0, 0);
-                player.markStale();
+                actor.markStale();
             }
         });
 
@@ -150,6 +139,27 @@ export class NetScene extends Scene {
             `players: ${this.playersQuery.entities.length}, ` +
             `asteroids: ${this.asteroidsQuery.entities.length}`;
         UI.debugText.setText(debug);
+    }
+
+    private actorOutOfWorld(actor: Actor) {
+        return (
+            Math.abs(actor.pos.x) > this.halfWorldSize || Math.abs(actor.pos.y) > this.halfWorldSize
+        );
+    }
+
+    private teleportActorBackToWorld(actor: Actor) {
+        while (actor.pos.x < -this.halfWorldSize) {
+            actor.pos.x += this.worldSize;
+        }
+        while (actor.pos.x > this.halfWorldSize) {
+            actor.pos.x -= this.worldSize;
+        }
+        while (actor.pos.y < -this.halfWorldSize) {
+            actor.pos.y += this.worldSize;
+        }
+        while (actor.pos.y > this.halfWorldSize) {
+            actor.pos.y -= this.worldSize;
+        }
     }
 
     onPostDraw(ctx: ExcaliburGraphicsContext, delta: number): void {
@@ -175,7 +185,7 @@ class SpaceGraphics {
             image: Resources.Space,
             pos: vec(0, 0),
             parallax: 0.1,
-            zoomResist: 1.3,
+            zoomResist: 0.5,
         });
         this.scene.add(space);
 
@@ -213,7 +223,7 @@ class SpaceGraphics {
         }
 
         const player = this.scene.player;
-        const worldSize = this.scene.worldSize;
+        const halfWorldSize = this.scene.halfWorldSize;
         const detectRadius = this.scene.detectRadiusSquare;
 
         const mapSize = 128;
@@ -249,8 +259,8 @@ class SpaceGraphics {
             }
 
             pos = vec(
-                linInt(transform.pos.x, -worldSize, worldSize, 0, mapSize - 2),
-                linInt(transform.pos.y, -worldSize, worldSize, 0, mapSize - 2)
+                linInt(transform.pos.x, -halfWorldSize, halfWorldSize, 0, mapSize - 2),
+                linInt(transform.pos.y, -halfWorldSize, halfWorldSize, 0, mapSize - 2)
             ).addEqual(offset);
 
             const size = (entity as Asteroid).asteroidType === AsteroidType.Large ? 2 : 1;
@@ -269,16 +279,16 @@ class SpaceGraphics {
             }
 
             pos = vec(
-                linInt(transform.pos.x, -worldSize, worldSize, 0, mapSize - 2),
-                linInt(transform.pos.y, -worldSize, worldSize, 0, mapSize - 2)
+                linInt(transform.pos.x, -halfWorldSize, halfWorldSize, 0, mapSize - 2),
+                linInt(transform.pos.y, -halfWorldSize, halfWorldSize, 0, mapSize - 2)
             ).addEqual(offset);
 
             ctx.drawRectangle(pos, 4, 4, Pallete.gray400);
         });
 
         pos = vec(
-            linInt(player.pos.x, -worldSize, worldSize, 0, mapSize - 2),
-            linInt(player.pos.y, -worldSize, worldSize, 0, mapSize - 2)
+            linInt(player.pos.x, -halfWorldSize, halfWorldSize, 0, mapSize - 2),
+            linInt(player.pos.y, -halfWorldSize, halfWorldSize, 0, mapSize - 2)
         ).addEqual(offset);
 
         ctx.drawRectangle(pos, 2, 2, Color.White);
@@ -290,7 +300,7 @@ class SpaceGraphics {
         const speed = player.vel.distance();
 
         const zoomFactor = lerp(speed, 0, 1000, easeOut);
-        const newZoom = 1.3 - zoomFactor * 0.4;
+        const newZoom = 1.6 - zoomFactor * 0.4;
 
         const lastZoom = engine.currentScene.camera.zoom;
 
@@ -314,7 +324,7 @@ class SpaceGraphics {
             sizeSpread: 2,
             timeToLive: 6000,
             timeToLiveSpread: 3000,
-            vel: vec(0.5,0.5),
+            vel: vec(0.5, 0.5),
             speedSpread: 1,
             angleSpread: TwoPI,
             rotationSpread: TwoPI,
@@ -325,6 +335,8 @@ class SpaceGraphics {
             blinkSpeedSpread: 400,
             blinkDelta: 0.05,
             blinkDeltaSpread: 0.05,
+            fadeInTime: 1000,
+            fadeInTimeSpread: 1000,
             z: -0.8,
             zSpread: 0.3,
             tag: this.bgStarTag,

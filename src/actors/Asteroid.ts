@@ -61,7 +61,7 @@ export class Asteroid extends NetActor<AsteroidState> {
             pos: options.pos ? vec(options.pos) : undefined,
             vel: options.vel ? vec(options.vel) : undefined,
             rotation: rand.floating(0, TwoPI),
-            angularVelocity: rand.floating(-1, 1),
+            angularVelocity: rand.floating(-3, 3),
             collisionType: CollisionType.Passive,
             collider: collider,
         });

@@ -44,6 +44,7 @@ export class Particle extends Entity {
     private color: Color;
     private origin: Vector;
     private blinkDelta: number;
+    private fadeInTime: number;
 
     private glare1!: Sprite;
     private glare2!: Sprite;
@@ -73,6 +74,7 @@ export class Particle extends Entity {
 
         this.timeToLive = Math.round(options.timeToLive);
         this.timeRemain = this.timeToLive;
+        this.fadeInTime = Math.abs(options.fadeInTime ?? 0);
 
         this.blinkSpeed = Math.abs(Math.round(options.blinkSpeed));
         this.timeAfterLastBlink = 0;
@@ -115,6 +117,8 @@ export class Particle extends Entity {
             this.glare1 = glare1;
             this.glare2 = glare2;
         }
+
+        this.calculateOpacity();
     }
 
     public get isOffScreen(): boolean {
@@ -136,9 +140,17 @@ export class Particle extends Entity {
             this.blinkDelta = -this.blinkDelta;
         }
 
+        this.calculateOpacity();
+    }
+
+    private calculateOpacity() {
         const rawOpacity =
-            (this.timeRemain / this.timeToLive) * this.initialOpacity - this.blinkDelta;
-        let opacity = clamp(rawOpacity, 0, 1);
+            (this.timeToLive - this.timeRemain < this.fadeInTime
+                ? ((this.timeToLive - this.timeRemain) / this.fadeInTime) * this.initialOpacity -
+                  this.blinkDelta
+                : (this.timeRemain / (this.timeToLive - this.fadeInTime)) * this.initialOpacity) -
+            this.blinkDelta;
+        const opacity = clamp(rawOpacity, 0, 1);
 
         this.color.a = opacity;
         if (this.withGlare) {
@@ -168,8 +180,8 @@ export class Particle extends Entity {
         amount?: number;
         opacity?: number;
         opacitySpread?: number;
-        fadeInTime?: number; // TODO
-        fadeInTimeSpread?: number; // TODO
+        fadeInTime?: number;
+        fadeInTimeSpread?: number;
         timeToLive: number;
         timeToLiveSpread?: number;
         blinkSpeed?: number;
@@ -200,6 +212,8 @@ export class Particle extends Entity {
             blinkSpeedSpread = 0,
             blinkDelta: initialBlinkDelta = 0,
             blinkDeltaSpread = 0,
+            fadeInTime: initialFadeInTime = 0,
+            fadeInTimeSpread = 0,
             z = 0,
             zSpread = 0,
             glareChange = 0,
@@ -247,6 +261,8 @@ export class Particle extends Entity {
             const rotation =
                 initialRotation + rand.floating(-rotationSpread * 0.5, rotationSpread * 0.5);
             const withGlare = clamp(glareChange, 0, 1) > rand.next();
+            const fadeInTime =
+                initialFadeInTime + rand.floating(-fadeInTimeSpread * 0.5, fadeInTimeSpread * 0.5);
 
             scene.add(
                 new Particle({
@@ -260,6 +276,7 @@ export class Particle extends Entity {
                     size,
                     parallax,
                     withGlare,
+                    fadeInTime,
                     tag: args.tag,
                 })
             );

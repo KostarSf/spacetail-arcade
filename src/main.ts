@@ -8,7 +8,7 @@ class Game extends Engine {
     constructor() {
         super({
             width: 400,
-            height: 600,
+            height: 800,
             displayMode: DisplayMode.FitContainerAndFill,
             antialiasing: false,
             backgroundColor: Color.Black,
