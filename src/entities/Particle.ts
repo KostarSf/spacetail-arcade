@@ -19,6 +19,7 @@ import { rand } from "~/utils/math";
 export interface ParticleOptions {
     pos: Vector;
     vel: Vector;
+    acc?: Vector;
     rotation?: number;
     timeToLive: number;
     size: number;
@@ -33,6 +34,9 @@ export interface ParticleOptions {
 
 export class Particle extends Entity {
     private vel: Vector;
+    private acc: Vector;
+
+    private parallaxFactor: number = 1;
 
     private size: number;
     private timeToLive: number;
@@ -50,12 +54,19 @@ export class Particle extends Entity {
     private glare2!: Sprite;
     private withGlare: boolean = false;
 
+    private saveIfOffscreen = false;
+
     public get pos() {
         return this.get(TransformComponent).pos;
     }
 
     public set pos(value: Vector) {
         this.get(TransformComponent).pos = value;
+    }
+
+    public translate(vector: Vector) {
+        this.pos.addEqual(vector.scale(this.parallaxFactor));
+        this.saveIfOffscreen = true;
     }
 
     constructor(options: ParticleOptions) {
@@ -68,6 +79,7 @@ export class Particle extends Entity {
 
         this.pos = options.pos;
         this.vel = options.vel;
+        this.acc = options.acc ?? Vector.Zero;
 
         this.size = Math.abs(options.size);
         this.origin = vec(-this.size / 2, -this.size / 2);
@@ -88,6 +100,7 @@ export class Particle extends Entity {
         if (options.parallax) {
             const factor = 1 + clamp(options.parallax, -1, 1);
             this.addComponent(new ParallaxComponent(vec(factor, factor)));
+            this.parallaxFactor = factor;
         }
 
         if (options.tag) {
@@ -127,12 +140,16 @@ export class Particle extends Entity {
 
     onPostUpdate(_engine: Engine, delta: number): void {
         this.timeRemain -= delta;
-        if (this.timeRemain <= 0 || this.isOffScreen) {
+        if (this.timeRemain <= 0 || (!this.saveIfOffscreen && this.isOffScreen)) {
             this.kill();
             return;
         }
 
-        this.pos.addEqual(this.vel.scale(delta / 1000));
+        this.saveIfOffscreen = false;
+
+        const secondsDelta = delta / 1000;
+        this.pos.addEqual(this.vel.scale(secondsDelta));
+        this.vel.addEqual(this.acc.scale(secondsDelta));
 
         this.timeAfterLastBlink += delta;
         if (this.timeAfterLastBlink > this.blinkSpeed) {
@@ -169,8 +186,8 @@ export class Particle extends Entity {
         sizeSpread?: number;
         pos: Vector;
         vel: Vector;
-        acc?: Vector; // TODO
-        accSpeedSpread?: number; // TODO
+        accSpeed?: number;
+        accSpeedSpread?: number;
         posSpread?: number;
         speedSpread?: number;
         angleSpread?: number;
@@ -200,6 +217,8 @@ export class Particle extends Entity {
             posSpread = 0,
             vel: initialVel,
             speedSpread = 0,
+            accSpeed = 0,
+            accSpeedSpread = 0,
             angleSpread = 0,
             rotation: initialRotation = 0,
             rotationSpread = 0,
@@ -217,6 +236,7 @@ export class Particle extends Entity {
             z = 0,
             zSpread = 0,
             glareChange = 0,
+            tag,
         } = args;
 
         if (!scene) {
@@ -225,6 +245,7 @@ export class Particle extends Entity {
 
         let pos: Vector;
         let vel: Vector;
+        let acc: Vector;
         for (let i = 0; i < amount; i++) {
             const parallax = clamp(z + rand.floating(-zSpread * 0.5, zSpread * 0.5), -0.95, 0.95);
 
@@ -244,8 +265,11 @@ export class Particle extends Entity {
             const speedDelta = rand.floating(-speedSpread * 0.5, speedSpread * 0.5);
             vel.x += vel.x * speedDelta;
             vel.y += vel.y * speedDelta;
-
             vel = vel.rotate(rand.floating(-angleSpread * 0.5, angleSpread * 0.5));
+
+            acc = vel
+                .normalize()
+                .scale(accSpeed + rand.floating(-accSpeedSpread * 0.5, accSpeedSpread * 0.5));
 
             const opacity =
                 initialOpacity + rand.floating(-opacitySpread * 0.5, opacitySpread * 0.5);
@@ -268,6 +292,7 @@ export class Particle extends Entity {
                 new Particle({
                     pos,
                     vel,
+                    acc,
                     rotation,
                     blinkSpeed,
                     timeToLive,
@@ -277,7 +302,7 @@ export class Particle extends Entity {
                     parallax,
                     withGlare,
                     fadeInTime,
-                    tag: args.tag,
+                    tag,
                 })
             );
         }

@@ -26,7 +26,7 @@ import { NetSystem } from "~/network/NetSystem";
 import Network from "~/network/Network";
 import { Resources } from "~/resources";
 import { UI } from "~/ui/web-ui";
-import { easeOut, lerp, linInt, rand } from "~/utils/math";
+import { easeIn, easeOut, lerp, linInt, rand } from "~/utils/math";
 
 export class NetScene extends Scene {
     public static readonly Key = "net-scene";
@@ -124,9 +124,14 @@ export class NetScene extends Scene {
             const actor = entity as NetActor;
 
             if (this.actorOutOfWorld(actor)) {
+                const oldPos = actor.pos.clone();
+
                 this.teleportActorBackToWorld(actor);
                 if (actor === this.player) {
-                    this.camera.pos = this.player.pos;
+                    const posDiff = actor.pos.sub(oldPos);
+                    this.camera.pos.addEqual(posDiff);
+                    this.camera.drawPos.addEqual(posDiff);
+                    this.graphics.translateStars(posDiff);
                 }
 
                 actor.markStale();
@@ -172,6 +177,10 @@ class SpaceGraphics {
     private starQuery!: TagQuery<typeof this.bgStarTag>;
     private starsLimit = 500;
 
+    private readonly bgStarDustTag = "bgstardust";
+    private starDustQuery!: TagQuery<typeof this.bgStarDustTag>;
+    private starDustLimit = 100;
+
     private scene: NetScene;
 
     constructor(scene: NetScene) {
@@ -180,6 +189,7 @@ class SpaceGraphics {
 
     initialize(_engine: Engine) {
         this.starQuery = this.scene.world.queryManager.createTagQuery([this.bgStarTag]);
+        this.starDustQuery = this.scene.world.queryManager.createTagQuery([this.bgStarDustTag]);
 
         const space = new Decal({
             image: Resources.Space,
@@ -213,6 +223,7 @@ class SpaceGraphics {
         }
 
         this.spawnStars(engine, delta);
+        this.spawnStarDust(engine, delta);
 
         this.updateCamera(engine, delta, this.scene.player);
     }
@@ -294,6 +305,15 @@ class SpaceGraphics {
         ctx.drawRectangle(pos, 2, 2, Color.White);
     }
 
+    public translateStars(vector: Vector) {
+        this.starQuery.entities.forEach((entity) => {
+            (entity as Particle).translate(vector);
+        });
+        this.starDustQuery.entities.forEach((entity) => {
+            (entity as Particle).translate(vector);
+        });
+    }
+
     private updateCamera(engine: Engine, delta: number, player: Player) {
         delta = delta / 1000;
 
@@ -340,6 +360,45 @@ class SpaceGraphics {
             z: -0.8,
             zSpread: 0.3,
             tag: this.bgStarTag,
+        });
+    }
+
+    private spawnStarDust(engine: Engine, _delta: number) {
+        if (this.starDustQuery.entities.length > this.starDustLimit) {
+            return;
+        }
+
+        const largestDimension =
+            engine.drawWidth > engine.drawHeight ? engine.drawWidth : engine.drawHeight;
+
+        const playerSpeed = this.scene.player?.vel.distance() ?? 0;
+        const speedCoeff = 0.1 + lerp(playerSpeed, 0, 500, easeIn) * 0.9;
+
+        if (speedCoeff < rand.next()) {
+            return;
+        }
+
+        Particle.emit({
+            scene: this.scene,
+            pos: this.scene.camera.pos,
+            posSpread: largestDimension + 32,
+            amount: Math.round(3 + 3 * speedCoeff),
+            size: 0.4 + speedCoeff,
+            sizeSpread: 0.6,
+            timeToLive: 1000 + 2000 * speedCoeff,
+            timeToLiveSpread: 400,
+            vel: Vector.Zero,
+            opacity: 0.4,
+            opacitySpread: 0.4,
+            blinkSpeed: 300,
+            blinkSpeedSpread: 200,
+            blinkDelta: 0.05,
+            blinkDeltaSpread: 0.05,
+            fadeInTime: 400,
+            fadeInTimeSpread: 200,
+            z: 0.2,
+            zSpread: 0.8,
+            tag: this.bgStarDustTag,
         });
     }
 }

@@ -94,27 +94,27 @@ export class Bullet extends NetActor<BulletState> {
                 return;
             }
 
-            if (this.scene) {
-                Particle.emit({
-                    scene: this.scene,
-                    pos: this.pos,
-                    posSpread: 5,
-                    vel: other.vel.sub(this.vel.negate().normalize().scale(50)),
-                    speedSpread: 1.2,
-                    angleSpread: Math.PI * 0.5,
-                    size: 1.5,
-                    sizeSpread: 0.5,
-                    timeToLive: 1000,
-                    timeToLiveSpread: 500,
-                    amount: rand.integer(10, 15),
-                    blinkDelta: 0.2,
-                    blinkDeltaSpread: 0.1,
-                    blinkSpeed: 200,
-                    blinkSpeedSpread: 50,
-                    opacity: 0.8,
-                    opacitySpread: 0.2,
-                });
-            }
+            Particle.emit({
+                scene: this.scene,
+                pos: this.pos,
+                posSpread: 5,
+                vel: other.vel.sub(this.vel.negate().normalize().scale(50)),
+                speedSpread: 1.2,
+                angleSpread: Math.PI * 0.5,
+                size: 1.5,
+                sizeSpread: 0.5,
+                timeToLive: 1000,
+                timeToLiveSpread: 500,
+                amount: rand.integer(10, 15),
+                blinkDelta: 0.2,
+                blinkDeltaSpread: 0.1,
+                blinkSpeed: 200,
+                blinkSpeedSpread: 50,
+                opacity: 0.8,
+                opacitySpread: 0.2,
+                accSpeed: -20,
+                accSpeedSpread: 20,
+            });
 
             if (!this.isReplica) {
                 this.kill();
@@ -153,6 +153,7 @@ export class Bullet extends NetActor<BulletState> {
                 blinkSpeed: 200,
                 blinkSpeedSpread: 100,
                 amount: rand.integer(15, 20),
+                accSpeed: -100,
             });
             return;
         }
@@ -187,6 +188,8 @@ export class Bullet extends NetActor<BulletState> {
             blinkSpeedSpread: 100,
             blinkDelta: 0.1,
             blinkDeltaSpread: 0.2,
+            accSpeed: -100,
+            accSpeedSpread: 50,
         });
     }
 

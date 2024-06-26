@@ -22,6 +22,7 @@ import { v4 } from "uuid";
 import { Pallete } from "~/constants";
 import { NetBodyComponent } from "~/ecs/physics.ecs";
 import { StatsComponent } from "~/ecs/stats.ecs";
+import { Particle } from "~/entities/Particle";
 import { ResourceLine } from "~/graphics/ResourceLine";
 import { ShadowedSprite } from "~/graphics/ShadowedSprite";
 import { NetActor } from "~/network/NetActor";
@@ -31,7 +32,6 @@ import { Animations, Resources } from "~/resources";
 import { easeOut, lerp, linear, rand, round, vecToArray } from "~/utils/math";
 import { Bullet } from "./Bullet";
 import { XpOrb } from "./XpOrb";
-import { Particle } from "~/entities/Particle";
 
 export interface PlayerState extends SerializableObject {
     pos: SerializedVector;
@@ -235,7 +235,7 @@ export class Player extends NetActor<PlayerState> {
                 this.shieldOpacity = evt.amount > 0 ? 0.5 : 1;
             }
 
-            if (evt.amount > 0 && this.scene) {
+            if (evt.amount > 0) {
                 Particle.emit({
                     scene: this.scene,
                     pos: this.pos,
@@ -256,6 +256,8 @@ export class Player extends NetActor<PlayerState> {
                     opacitySpread: 0.1,
                     z: 0.2,
                     zSpread: 0.6,
+                    accSpeed: -20,
+                    accSpeedSpread: 10,
                 });
             }
         });
@@ -284,6 +286,7 @@ export class Player extends NetActor<PlayerState> {
                 opacitySpread: 0.1,
                 z: 0.2,
                 zSpread: 0.6,
+                accSpeed: -5,
             });
 
             if (this.isReplica || this.isKilled() || !this.scene) {
