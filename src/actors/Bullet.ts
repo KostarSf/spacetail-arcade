@@ -1,5 +1,6 @@
-import { CollisionType, Engine, Vector, vec } from "excalibur";
-import { drawGlare } from "~/graphics/Glare";
+import { Actor, clamp, CollisionType, Engine, vec, Vector } from "excalibur";
+import { Particle } from "~/entities/Particle";
+import { Glare } from "~/graphics/Glare";
 import { NetActor } from "~/network/NetActor";
 import { DamageAction } from "~/network/events/actions/DamageAction";
 import { ReceiverType, SerializableObject } from "~/network/events/types";
@@ -7,7 +8,6 @@ import { ActorType, SerializedVector } from "~/network/types";
 import { rand, round, vecToArray } from "~/utils/math";
 import { Animations } from "../resources";
 import { XpOrb } from "./XpOrb";
-import { Particle } from "~/entities/Particle";
 
 export interface BulletState extends SerializableObject {
     shooter: string | null;
@@ -18,6 +18,8 @@ export interface BulletState extends SerializableObject {
     damage: number;
     healthDeflection: number;
     armorDeflection: number;
+
+    timeRemain: number;
 }
 
 export interface BulletOptions {
@@ -48,6 +50,11 @@ export class Bullet extends NetActor<BulletState> {
     public healthDeflection: number;
     public armorDeflection: number;
 
+    private timeToLive = 5000;
+    private timeRemain = this.timeToLive;
+
+    private glare!: Actor;
+
     constructor(options: BulletOptions) {
         super({
             name: "Bullet",
@@ -67,11 +74,14 @@ export class Bullet extends NetActor<BulletState> {
         this.armorDeflection = options.armorDeflection ?? 1;
     }
 
-    onInitialize(engine: Engine): void {
+    onInitialize(_engine: Engine): void {
         const animation = Animations.Bullet;
-        animation.scale.setTo(1.5, 1.1);
-
+        animation.scale.setTo(1.8, 1.3);
         this.graphics.use(animation);
+
+        this.glare = new Actor();
+        this.glare.graphics.use(new Glare({ rotationFn: () => -this.rotation - Math.PI }));
+        this.addChild(this.glare);
 
         this.on("collisionstart", (evt) => {
             const other = evt.other;
@@ -120,15 +130,43 @@ export class Bullet extends NetActor<BulletState> {
                 );
             }
         });
-
-        this.on("postdraw", (evt) => {
-            drawGlare(evt.ctx, this, engine.currentScene.camera, 1, 5);
-        });
-
-        this.actions.delay(5000).die();
     }
 
-    onPostUpdate(engine: Engine, _delta: number): void {
+    onPostUpdate(engine: Engine, delta: number): void {
+        this.timeRemain -= delta;
+        if (this.timeRemain <= 0) {
+            this.kill();
+            Particle.emit({
+                scene: this.scene,
+                pos: this.pos,
+                vel: this.vel.scale(0.6),
+                speedSpread: 1,
+                angleSpread: 0.3,
+                timeToLive: 2000,
+                timeToLiveSpread: 2000,
+                size: 1,
+                sizeSpread: 2,
+                opacity: 0.7,
+                opacitySpread: 2,
+                blinkDelta: 0.1,
+                blinkDeltaSpread: 0.1,
+                blinkSpeed: 200,
+                blinkSpeedSpread: 100,
+                amount: rand.integer(15, 20),
+            });
+            return;
+        }
+
+        const timeFactor = 0.3 + clamp(this.timeToLive / this.timeRemain, 0, 0.7);
+
+        const sizeFactor =
+            0.3 +
+            this.scene!.camera.pos.sub(this.pos).squareDistance() * 0.000005 * (timeFactor - 0.25);
+        this.glare.scale.setTo(sizeFactor, sizeFactor);
+        this.glare.graphics.opacity = clamp(timeFactor + rand.floating(-0.7, 0), 0, 1);
+
+        this.graphics.current!.scale = Vector.One.scale(timeFactor);
+
         if (0.2 < rand.next()) {
             return;
         }
@@ -161,6 +199,7 @@ export class Bullet extends NetActor<BulletState> {
             damage: round(this.damage, 2),
             healthDeflection: round(this.healthDeflection, 2),
             armorDeflection: round(this.armorDeflection, 2),
+            timeRemain: this.timeRemain,
         };
     }
 
@@ -172,6 +211,8 @@ export class Bullet extends NetActor<BulletState> {
         this.damage = state.damage;
         this.healthDeflection = state.healthDeflection;
         this.armorDeflection = state.armorDeflection;
+
+        this.timeRemain = state.timeRemain;
 
         if (state.shooter) {
             this.shooter = actors.get(state.shooter) ?? null;

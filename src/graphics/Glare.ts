@@ -3,10 +3,36 @@ import {
     Color,
     Entity,
     ExcaliburGraphicsContext,
+    Sprite,
     TransformComponent,
     vec,
+    Vector,
 } from "excalibur";
+import { Resources } from "~/resources";
 import { rand } from "~/utils/math";
+
+export interface GlareOptions {
+    rotationFn: () => number;
+    scale?: Vector;
+}
+
+export class Glare extends Sprite {
+    private rotationFn: () => number;
+
+    constructor(options: GlareOptions) {
+        super({
+            image: Resources.Glare,
+            scale: options.scale,
+        });
+
+        this.rotationFn = options.rotationFn;
+    }
+
+    protected _preDraw(ex: ExcaliburGraphicsContext, x: number, y: number): void {
+        super._preDraw(ex, x, y);
+        this.rotation = this.rotationFn();
+    }
+}
 
 const glareColor = Color.White;
 
