@@ -1,15 +1,50 @@
-FROM node:20
+# -------------------------------------------
+FROM node:20.15.0-alpine3.20 as base
 
-WORKDIR /usr/src/app
+ENV NODE_ENV production
 
-COPY package*.json ./
-RUN npm ci
+# -------------------------------------------
+FROM base as deps
 
-COPY . .
+WORKDIR /app
+
+ADD package.json package-lock.json ./
+
+RUN npm install --include=dev
+
+# -------------------------------------------
+FROM base as production-deps
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules /app/node_modules
+ADD package.json package-lock.json ./
+
+RUN npm prune --omit=dev
+
+# -------------------------------------------
+FROM base as build
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules /app/node_modules
+ADD . .
 
 RUN npm run build
 
-EXPOSE 3000
+# -------------------------------------------
+FROM base
 
-# Define the command to run the application
+ENV PORT="3000"
+ENV NODE_ENV="production"
+
+EXPOSE 3000
+EXPOSE 8080
+
+WORKDIR /app
+
+COPY --from=production-deps /app/node_modules /app/node_modules
+COPY --from=build /app/dist /app/dist
+COPY --from=build /app/package.json /app/package.json
+
 CMD ["npm", "run", "serve"]
