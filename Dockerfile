@@ -1,10 +1,10 @@
 # -------------------------------------------
-FROM node:20.15.0-alpine3.20 as base
+FROM node:20.15.0-alpine3.20 AS base
 
 ENV NODE_ENV production
 
 # -------------------------------------------
-FROM base as deps
+FROM base AS deps
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ ADD package.json package-lock.json ./
 RUN npm install --include=dev
 
 # -------------------------------------------
-FROM base as production-deps
+FROM base AS production-deps
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ ADD package.json package-lock.json ./
 RUN npm prune --omit=dev
 
 # -------------------------------------------
-FROM base as build
+FROM base AS build
 
 WORKDIR /app
 
