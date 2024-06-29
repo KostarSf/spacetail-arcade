@@ -256,8 +256,8 @@ export class Player extends NetActor<PlayerState> {
                     opacitySpread: 0.1,
                     z: 0.2,
                     zSpread: 0.6,
-                    accSpeed: -20,
-                    accSpeedSpread: 10,
+                    accSpeed: -10,
+                    accSpeedSpread: 4,
                 });
             }
         });
