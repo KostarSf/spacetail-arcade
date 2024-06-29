@@ -9,13 +9,28 @@ export class BlackHole extends Actor {
     }
 
     onInitialize(engine: Engine): void {
-        this.graphics.material = engine.graphicsContext.createMaterial({
+        const material = (this.graphics.material = engine.graphicsContext.createMaterial({
             name: "bh-mat",
             fragmentSource: bgFragment,
+        }));
+
+        const camera = engine.currentScene.camera;
+        let oldZoom = camera.zoom;
+
+        material.update((shader) => {
+            shader.trySetUniformFloat("u_zoom", camera.zoom);
         });
 
         this.on("postupdate", () => {
-            this.pos = engine.input.pointers.primary.lastWorldPos;
+            this.pos = engine.screenToWorldCoordinates(engine.input.pointers.primary.lastScreenPos);
+
+            if (Math.abs(camera.zoom - oldZoom) > 0.01) {
+                oldZoom = camera.zoom;
+
+                material.update((shader) => {
+                    shader.trySetUniformFloat('u_zoom', camera.zoom)
+                });
+            }
         });
     }
 }
@@ -26,42 +41,63 @@ const bgFragment = `
 precision mediump float;
 
 uniform float u_time_ms;
+
 uniform vec2 u_resolution;
 uniform vec2 u_graphic_resolution;
+
 uniform sampler2D u_graphic;
 uniform sampler2D u_screen_texture;
+
+uniform vec2 u_size;
+
+uniform float u_zoom;
 
 in vec2 v_uv;
 in vec2 v_screenuv;
 
 out vec4 fragColor;
 
-vec2 warp() {
+vec2 normalizePos() {
+    float aspect = u_resolution.y / u_resolution.x;
+    float scale = 0.078;   // u_zoom * 0.05;   // 0.078;
+
+    vec2 v2 = v_screenuv + v_uv * 0.15;
+    v2.y = -v2.y;
+
+    return v2;
+}
+
+vec2 warpPos(vec2 pos) {
     vec2 localCenter = v_uv - vec2(0.5);
+    localCenter.y = -localCenter.y;
+
     float distance = length(localCenter);
-    vec2 warpedPos = v_screenuv - (localCenter * distance);
-    warpedPos.y = -warpedPos.y;
+    // float factor = max(0.0, .7 - pow(abs(distance), 0.5));
+    float factor = max(0.0, .6 - pow(abs(sin(3.14 * distance / 2.)), 1.5));
+    vec2 warpedPos = pos - (localCenter * factor);
+
     return warpedPos;
 }
 
-void main() {
-    vec4 transparent = vec4(0., 0., 0., 0.);
-    vec4 dark = vec4(0.1, 0.1, 0.1, 0.9);
-    vec4 black = vec4(0.0, 0.0, 0.0, 1.0);
-
+float holeBlend() {
     vec2 localCenter = v_uv - vec2(0.5);
+    localCenter.y = -localCenter.y;
+
     float distance = length(localCenter);
-    float blend = 1.0 - pow(max(0.0, abs(distance) * 2.0 - 0.5), 0.5) * 1.5;
-    float blend2 = 1.0 - pow(max(0.0, abs(distance) * 2.0 - 0.5), 0.3) * 1.5;
 
-    vec2 v2 = v_screenuv + v_uv * 0.1;
+    return 1.0 - pow(max(0.0, abs(distance / 0.3) * 2.0 - 1.0), 2.0);
+}
 
-    vec2 warpedPos = v2 - (localCenter * distance);
-    warpedPos.y = -warpedPos.y;
+void main() {
+    vec2 pos = normalizePos();
+    vec2 warpedPos = warpPos(pos);
 
     vec4 t = texture(u_screen_texture, warpedPos);
-    vec4 wt = mix(t, dark, 0.2);
+    // fragColor = mix(t, vec4(1., 0., 0., 1.0), 0.2);
 
-    fragColor = mix(transparent, wt, blend);// mix(mix(transparent, wt, blend), black, blend2);
+    // vec4 dark = vec4(0.1, 0.1, 0.1, 1.);
+    // fragColor = mix(t, dark, holeBlend());
+
+    fragColor = t;
 }
 `.trim();
