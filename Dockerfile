@@ -36,6 +36,7 @@ RUN npm run build
 FROM base
 
 ENV PORT="3000"
+ENV WS_PORT="8080"
 ENV NODE_ENV="production"
 
 EXPOSE 3000

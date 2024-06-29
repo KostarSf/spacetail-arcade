@@ -7,6 +7,7 @@ import { runGameServer } from "./game-server";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const WS_PORT = process.env.WS_PORT || 8080;
 
 app.use(compression());
 
@@ -28,5 +29,5 @@ if (process.env.NODE_ENV === "production") {
 app.listen(PORT, () => {
     console.log(`HTTP server is running on http://localhost:${PORT}`);
 
-    runGameServer();
+    runGameServer(+WS_PORT);
 });
