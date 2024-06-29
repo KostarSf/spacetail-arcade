@@ -49,13 +49,13 @@ class Network {
         return Date.now() + this.simulatedClockDrift;
     }
 
-    constructor(host: string) {
+    constructor() {
         this.createEntityEvents = [];
         this.updateEntityEvents = [];
         this.killedEntities = new Set();
         this.entityActionsEvents = [];
 
-        this.host = host;
+        this.host = "";
         this.socket = null;
         this.scheduledEvents = new Map();
 
@@ -168,7 +168,9 @@ class Network {
         this.socket.send(message);
     }
 
-    public connect(): Promise<void> {
+    public connect(host: string): Promise<void> {
+        this.host = host;
+
         return new Promise((res, rej) => {
             this.socket = this._connect();
             this.socket.addEventListener("open", () => {
@@ -197,4 +199,4 @@ class Network {
     }
 }
 
-export default new Network(`ws://${document.location.hostname}:8080`);
+export default new Network();

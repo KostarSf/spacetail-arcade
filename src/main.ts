@@ -31,7 +31,8 @@ class Game extends Engine {
                 }
             });
 
-            await Network.connect();
+            const wsHost = import.meta.env.PROD ? "/ws/" : "ws://localhost:8080";
+            await Network.connect(wsHost);
 
             this.goToScene(NetScene.Key);
         });

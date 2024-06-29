@@ -10,10 +10,8 @@ const PORT = process.env.PORT || 3000;
 const WS_PORT = process.env.WS_PORT || 8080;
 
 app.use(compression());
-
-app.disable("x-powered-by");
-
 app.use(morgan("tiny"));
+app.disable("x-powered-by");
 
 if (process.env.NODE_ENV === "production") {
     const __filename = fileURLToPath(import.meta.url);
@@ -28,6 +26,5 @@ if (process.env.NODE_ENV === "production") {
 
 app.listen(PORT, () => {
     console.log(`HTTP server is running on http://localhost:${PORT}`);
-
     runGameServer(+WS_PORT);
 });
