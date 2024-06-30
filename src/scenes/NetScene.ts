@@ -144,6 +144,11 @@ export class NetScene extends Scene {
             `players: ${this.playersQuery.entities.length}, ` +
             `asteroids: ${this.asteroidsQuery.entities.length}`;
         UI.debugText.setText(debug);
+
+        const xp = this.player?.xp ?? 0;
+        const level = Math.floor(1 + xp / 100);
+        UI.levelText.setText(`${level} LVL`);
+        UI.xpText.setText(`${xp} XP`);
     }
 
     private actorOutOfWorld(actor: Actor) {
@@ -229,6 +234,11 @@ class SpaceGraphics {
     }
 
     draw(ctx: ExcaliburGraphicsContext, _delta: number): void {
+        this.drawRadar(ctx);
+        this.drawLevelLine(ctx);
+    }
+
+    private drawRadar(ctx: ExcaliburGraphicsContext) {
         if (!this.scene.player || !this.scene.player.active) {
             return;
         }
@@ -303,6 +313,36 @@ class SpaceGraphics {
         ).addEqual(offset);
 
         ctx.drawRectangle(pos, 2, 2, Color.White);
+    }
+
+    private drawLevelLine(ctx: ExcaliburGraphicsContext) {
+        if (!this.scene.player || !this.scene.player.active) {
+            return;
+        }
+
+        const width = this.scene.engine.canvasWidth;
+        const height = this.scene.engine.canvasHeight;
+
+        const thickness = 10;
+        const offset = 4;
+
+        const xp = this.scene.player?.xp ?? 0;
+        const percentage = (xp % 100) / 100;
+
+        const start = vec(offset, height - offset - thickness / 2);
+        const end = vec(
+            offset + (width - offset * 2) * percentage,
+            height - offset - thickness / 2
+        );
+
+        const shadowStart = vec(offset + 2, height - offset - thickness / 2 + 2);
+        const shadowEnd = vec(
+            offset + 2 + (width - offset * 2),
+            height - offset - thickness / 2 + 2
+        );
+
+        ctx.drawLine(shadowStart, shadowEnd, Pallete.gray800, thickness);
+        ctx.drawLine(start, end, Color.White, thickness);
     }
 
     public translateStars(vector: Vector) {

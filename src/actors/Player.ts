@@ -6,14 +6,11 @@ import {
     CollisionType,
     Color,
     Engine,
-    Font,
     GraphicsGroup,
     Keys,
-    Label,
     PointerButton,
     PolygonCollider,
     Sprite,
-    TextAlign,
     TwoPI,
     Vector,
     vec,
@@ -217,18 +214,7 @@ export class Player extends NetActor<PlayerState> {
             xpOrb.markStale();
         });
 
-        const xpLabel = new Label({
-            color: Pallete.gray200,
-            pos: this.pos,
-            font: new Font({ textAlign: TextAlign.Center, family: "monospace" }),
-        });
-        xpLabel.on("postupdate", () => {
-            xpLabel.pos = this.pos.add(vec(0, 15));
-            xpLabel.text = this.xp.toFixed();
-        });
-
         engine.currentScene.add(xpOrbGatherer);
-        engine.currentScene.add(xpLabel);
 
         this.on("damage", (evt) => {
             if (evt.consumed >= 0) {
@@ -264,7 +250,6 @@ export class Player extends NetActor<PlayerState> {
 
         this.on("kill", () => {
             xpOrbGatherer.kill();
-            xpLabel.kill();
 
             Particle.emit({
                 scene: this.scene,

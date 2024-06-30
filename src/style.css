@@ -25,7 +25,7 @@ body {
     padding: 10px;
 }
 
-.ui-wrapper {
+#ui-wrapper {
     position: absolute;
     inset: 0;
 
