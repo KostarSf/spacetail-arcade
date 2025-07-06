@@ -31,7 +31,7 @@ class Game extends Engine {
                 }
             });
 
-            const wsHost = import.meta.env.PROD ? "/ws/" : "ws://localhost:8080";
+            const wsHost = import.meta.env.PROD ? "wss://ws.spacetail.kostarlab.ru/" : "ws://localhost:8080";httpshttps
             await Network.connect(wsHost);
 
             this.goToScene(NetScene.Key);
